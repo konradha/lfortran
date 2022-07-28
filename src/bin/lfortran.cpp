@@ -1374,6 +1374,31 @@ int main(int argc, char *argv[])
     LFortran::print_stack_on_segfault();
 #endif
     try {
+        char** utf8argv;
+        std::vector<std::string> utf8Args;
+        std::vector<char*> utf8CharArgs;
+        for (int i = 0; i < argc; i++)
+        {
+            const char *s = argv[i];
+            std::string ss{s};
+            if (std::string(s) == "-module") {
+                utf8Args.push_back("--module");
+                continue;
+            }
+            if (std::string(argv[i]) == "-ffree-form")
+                continue;
+            if (ss.substr(0,2) == "-O")
+                continue;
+            utf8Args.push_back((argv[i]));
+            // utf8Args.push_back((argv[i]));
+        }
+        for (int i = 0; i < argc; ++i)
+        {
+            utf8CharArgs.push_back(utf8Args[i].data());
+        }
+        utf8argv = utf8CharArgs.data();
+
+
         int dirname_length;
         LFortran::get_executable_path(LFortran::binary_executable_path, dirname_length);
 
@@ -1422,6 +1447,8 @@ int main(int argc, char *argv[])
         std::string arg_mod_file;
         bool arg_mod_show_asr = false;
         bool arg_mod_no_color = false;
+
+        bool module = false;
 
         std::string arg_pywrap_file;
         std::string arg_pywrap_array_order="f";
@@ -1476,6 +1503,7 @@ int main(int argc, char *argv[])
         app.add_flag("--link-with-gcc", link_with_gcc, "Calls GCC for linking instead of clang");
         app.add_option("--target", compiler_options.target, "Generate code for the given target")->capture_default_str();
         app.add_flag("--print-targets", print_targets, "Print the registered targets");
+        app.add_flag("--module", module, "Define as module");
 
         if( compiler_options.fast ) {
             lfortran_pass_manager.use_optimization_passes();
@@ -1511,7 +1539,8 @@ int main(int argc, char *argv[])
 
         app.get_formatter()->column_width(25);
         app.require_subcommand(0, 1);
-        CLI11_PARSE(app, argc, argv);
+        // TODO HERE
+        CLI11_PARSE(app, argc, utf8argv);
 
         if (arg_version) {
             std::string version = LFORTRAN_VERSION;
