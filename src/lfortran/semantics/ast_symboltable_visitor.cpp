@@ -64,7 +64,6 @@ void extract_bind(T &x, ASR::abiType &abi_type, char *&bindc_name) {
 
 class SymbolTableVisitor : public CommonVisitor<SymbolTableVisitor> {
 public:
-    SymbolTable *global_scope;
     std::map<std::string, std::vector<std::string>> generic_procedures;
     std::map<std::string, std::map<std::string, std::vector<std::string>>> generic_class_procedures;
     std::map<AST::intrinsicopType, std::vector<std::string>> overloaded_op_procs;
