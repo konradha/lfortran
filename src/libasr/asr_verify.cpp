@@ -96,6 +96,7 @@ public:
 
     void visit_TranslationUnit(const TranslationUnit_t &x) {
         current_symtab = x.m_global_scope;
+        std::cout << "owner is current_symtab->asr_owner " << current_symtab->asr_owner << " versus (ASR::asr_t*)&x " << (ASR::asr_t*)&x << "\n";
         require(x.m_global_scope != nullptr,
             "The TranslationUnit::m_global_scope cannot be nullptr");
         require(x.m_global_scope->parent == nullptr,
@@ -233,6 +234,7 @@ public:
     void visit_Function(const Function_t &x) {
         SymbolTable *parent_symtab = current_symtab;
         current_symtab = x.m_symtab;
+        std::cout << "x.sym_tab " <<  x.m_symtab->asr_owner  << " versus (ASR::asr_t*)&x " << (ASR::asr_t*)&x << "\n";
         require(x.m_symtab != nullptr,
             "The Function::m_symtab cannot be nullptr");
         require(x.m_symtab->parent == parent_symtab,

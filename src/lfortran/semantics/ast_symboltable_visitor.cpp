@@ -75,6 +75,7 @@ public:
     bool is_interface = false;
     std::string interface_name = "";
     ASR::symbol_t *current_module_sym;
+    SymbolTable *global_scope;
 
     std::map<AST::intrinsicopType, std::string> intrinsic2str = {
         {AST::intrinsicopType::STAR, "~mul"},
@@ -334,6 +335,29 @@ public:
                 f2->m_abi == ASR::abiType::Interactive) {
                 // Previous declaration will be shadowed
                 parent_scope->erase_symbol(sym_name);
+
+            } else if (f1->type != ASR::symbolType::ExternalSymbol && f2->m_deftype == ASR::Interface &&
+                        f2->n_args == 10000) { // TODO refine this check
+                f2->m_args = args.p;
+                f2->n_args = args.size();
+                f2->m_body = nullptr;
+                f2->n_body = 0;
+                f2->m_return_var = nullptr;
+                f2->m_access = s_access;
+                f2->m_deftype = deftype;
+                f2->m_bindc_name = bindc_name;
+                f2->m_abi = current_procedure_abi_type;
+                f2->m_symtab = current_scope;
+                std::cout << "in DeclUtil: func->symtab->asr_owner is: " << f2->m_symtab->asr_owner << "\n";
+                std::cout << "in DeclUtil: parent_scope is " << parent_scope << "\n";
+                std::cout << "in DeclUtil: current_scope is " << current_scope << "\n";
+                std::cout << "in DeclUtil: &f2 is " << f2 << "\n";
+                tmp = (ASR::asr_t*)(f2); // Up-cast?
+                f2->m_symtab->asr_owner = tmp; // this seems really hacky
+                current_scope = parent_scope;
+                current_procedure_args.clear();
+                current_procedure_abi_type = ASR::abiType::Source;
+                return;               
             } else {
                 throw SemanticError("Subroutine already defined", tmp->loc);
             }

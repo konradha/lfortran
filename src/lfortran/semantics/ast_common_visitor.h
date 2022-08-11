@@ -633,8 +633,6 @@ public:
         {AST::cmpopType::GtE, "~gte"}
     };
 
-    SymbolTable *global_scope = nullptr;
-
     ASR::asr_t *tmp;
     Allocator &al;
     CompilerOptions &compiler_options;
@@ -888,26 +886,19 @@ public:
                                     ::AttrExternal) {
                                 auto fn_name = sym.data();
                                 auto v = current_scope->resolve_symbol(fn_name);
-                                
-                                if (!v) {
-                                    std::cout << "instantianting symbol " << fn_name << " in symtab\n";
-// (Allocator &al, const Location &a_loc, SymbolTable* a_symtab, char* a_name, expr_t** a_args, size_t n_args, ttype_t** a_type_params,
-//  size_t n_type_params, stmt_t** a_body, size_t n_body, expr_t* a_return_var, abiType a_abi, accessType a_access, deftypeType a_deftype, 
-//  char* a_bindc_name, bool a_elemental, bool a_pure, bool a_module)
-                                    // Q: How to set global scope for a function AND THEN retrieve said function when called to update?
-                                    if (global_scope != nullptr) {
-                                        LFortran::ASR::asr_t *f = ASR::make_Function_t(al, s.loc, global_scope, s2c(al, sym),
-                                            nullptr, 10000, nullptr, 10000, nullptr, 10000, nullptr,
-                                            ASR::abiType::Source, ASR::accessType::Public,
-                                            ASR::deftypeType::Interface, nullptr, false, false, false);
-                                        // global_scope->add_symbol(sym, f);
-                                    } else {
-                                        throw SemanticError("Can only parse declarations within Body Visitor", x.base.base.loc);
-                                    }
-
-                                    // current_scope->add_symbol(fn_name, f);
+                                auto scope = current_scope;
+                                while(scope->parent) scope = scope->parent;
+                                if (v) throw SemanticError("External procedure already declared", x.base.base.loc);
+                                if (scope != nullptr) {
+                                    LFortran::ASR::asr_t *function = ASR::make_Function_t(al, s.loc, current_scope, s2c(al, sym),
+                                        nullptr, 10000, nullptr, 10000, nullptr, 10000, nullptr,
+                                        ASR::abiType::Source, ASR::accessType::Public,
+                                        ASR::deftypeType::Interface, nullptr, false, false, false);
+                                    auto new_symbol = ASR::down_cast<ASR::symbol_t>(function);
+                                    current_scope->parent->add_symbol(sym, new_symbol);
+                                    std::cout << "in AttrVisit: scope->asr_owner is: " << scope->asr_owner << "\n";
                                 } else {
-                                    throw SemanticError("External procedure already declared", x.base.base.loc);
+                                    throw SemanticError("Can only parse declarations within Body Visitor", x.base.base.loc);
                                 }
                             } else {
                                 throw SemanticError("Attribute declaration not "
