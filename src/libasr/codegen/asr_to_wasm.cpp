@@ -112,8 +112,8 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
         no_of_imports = 0;
         no_of_data_segments = 0;
 
-        min_no_pages = 10;
-        max_no_pages = 100;
+        min_no_pages = 100; // fixed 6.4 Mb memory currently
+        max_no_pages = 100; // fixed 6.4 Mb memory currently
 
         m_type_section.reserve(m_al, 1024 * 128);
         m_import_section.reserve(m_al, 1024 * 128);
@@ -154,7 +154,8 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
             {"print_f32", { {ASR::ttypeType::Real, 4} }, {}},
             {"print_f64", { {ASR::ttypeType::Real, 8} }, {}},
             {"print_str", { {ASR::ttypeType::Integer, 4}, {ASR::ttypeType::Integer, 4} }, {}},
-            {"flush_buf", {}, {}}
+            {"flush_buf", {}, {}},
+            {"set_exit_code", { {ASR::ttypeType::Integer, 4} }, {}}
          };
 
         for (auto import_func:import_funcs) {
@@ -418,8 +419,7 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
         }
     }
 
-    template<typename T>
-    void emit_function_prototype(const T& x) {
+    void emit_function_prototype(const ASR::Function_t &x) {
         SymbolFuncInfo* s = new SymbolFuncInfo;
 
         /********************* New Type Declaration *********************/
@@ -459,8 +459,7 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
         m_func_name_idx_map[get_hash((ASR::asr_t *)&x)] = s; // add function to map
     }
 
-    template<typename T>
-    void emit_function_body(const T& x) {
+    void emit_function_body(const ASR::Function_t &x) {
         LFORTRAN_ASSERT(m_func_name_idx_map.find(get_hash((ASR::asr_t *)&x)) != m_func_name_idx_map.end());
 
         cur_sym_info = m_func_name_idx_map[get_hash((ASR::asr_t *)&x)];
@@ -474,6 +473,10 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
         emit_local_vars(x, cur_sym_info->no_of_variables);
         for (size_t i = 0; i < x.n_body; i++) {
             this->visit_stmt(*x.m_body[i]);
+        }
+        if (strcmp(x.m_name, "_lcompilers_main") == 0) {
+            wasm::emit_i32_const(m_code_section,m_al, 0 /* zero exit code */);
+            wasm::emit_call(m_code_section, m_al, m_func_name_idx_map[get_hash(m_import_func_asr_map["set_exit_code"])]->index);
         }
         if ((x.n_body > 0) && !ASR::is_a<ASR::Return_t>(*x.m_body[x.n_body - 1])) {
             handle_return();
@@ -661,9 +664,25 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
                     wasm::emit_i32_div_s(m_code_section, m_al);
                     break;
                 };
+                case ASR::binopType::Pow: {
+                    ASR::expr_t *val = ASRUtils::expr_value(x.m_right);
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*val)) {
+                        ASR::IntegerConstant_t *c = ASR::down_cast<ASR::IntegerConstant_t>(val);
+                        if (c->m_n == 2) {
+                            // drop the last stack item in the wasm stack
+                            wasm::emit_drop(m_code_section, m_al);
+                            this->visit_expr(*x.m_left);
+                            wasm::emit_i32_mul(m_code_section, m_al);
+                        } else {
+                            throw CodeGenError("IntegerBinop kind 4: only x**2 implemented so far for powers");
+                        }
+                    } else {
+                        throw CodeGenError("IntegerBinop kind 4: only x**2 implemented so far for powers");
+                    }
+                    break;
+                };
                 default: {
-                    // Todo: Implement Pow Operation
-                    throw CodeGenError("IntegerBinop: Pow Operation not yet implemented");
+                    throw CodeGenError("ICE IntegerBinop kind 4: unknown operation");
                 }
             }
         } else if (i->m_kind == 8) {
@@ -684,9 +703,25 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
                     wasm::emit_i64_div_s(m_code_section, m_al);
                     break;
                 };
+                case ASR::binopType::Pow: {
+                    ASR::expr_t *val = ASRUtils::expr_value(x.m_right);
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*val)) {
+                        ASR::IntegerConstant_t *c = ASR::down_cast<ASR::IntegerConstant_t>(val);
+                        if (c->m_n == 2) {
+                            // drop the last stack item in the wasm stack
+                            wasm::emit_drop(m_code_section, m_al);
+                            this->visit_expr(*x.m_left);
+                            wasm::emit_i64_mul(m_code_section, m_al);
+                        } else {
+                            throw CodeGenError("IntegerBinop kind 8: only x**2 implemented so far for powers");
+                        }
+                    } else {
+                        throw CodeGenError("IntegerBinop kind 8: only x**2 implemented so far for powers");
+                    }
+                    break;
+                };
                 default: {
-                    // Todo: Implement Pow Operation
-                    throw CodeGenError("IntegerBinop: Pow Operation not yet implemented");
+                    throw CodeGenError("ICE IntegerBinop kind 8: unknown operation");
                 }
             }
         } else {
@@ -720,9 +755,25 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
                     wasm::emit_f32_div(m_code_section, m_al);
                     break;
                 };
+                case ASR::binopType::Pow: {
+                    ASR::expr_t *val = ASRUtils::expr_value(x.m_right);
+                    if (ASR::is_a<ASR::RealConstant_t>(*val)) {
+                        ASR::RealConstant_t *c = ASR::down_cast<ASR::RealConstant_t>(val);
+                        if (c->m_r == 2.0) {
+                            // drop the last stack item in the wasm stack
+                            wasm::emit_drop(m_code_section, m_al);
+                            this->visit_expr(*x.m_left);
+                            wasm::emit_f32_mul(m_code_section, m_al);
+                        } else {
+                            throw CodeGenError("RealBinop: only x**2 implemented so far for powers");
+                        }
+                    } else {
+                        throw CodeGenError("RealBinop: only x**2 implemented so far for powers");
+                    }
+                    break;
+                };
                 default: {
-                    // Todo: Implement Pow Operation
-                    throw CodeGenError("RealBinop: Pow Operation not yet implemented");
+                    throw CodeGenError("ICE RealBinop kind 4: unknown operation");
                 }
             }
         } else if (f->m_kind == 8) {
@@ -743,9 +794,25 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
                     wasm::emit_f64_div(m_code_section, m_al);
                     break;
                 };
+                case ASR::binopType::Pow: {
+                    ASR::expr_t *val = ASRUtils::expr_value(x.m_right);
+                    if (ASR::is_a<ASR::RealConstant_t>(*val)) {
+                        ASR::RealConstant_t *c = ASR::down_cast<ASR::RealConstant_t>(val);
+                        if (c->m_r == 2.0) {
+                            // drop the last stack item in the wasm stack
+                            wasm::emit_drop(m_code_section, m_al);
+                            this->visit_expr(*x.m_left);
+                            wasm::emit_f64_mul(m_code_section, m_al);
+                        } else {
+                            throw CodeGenError("RealBinop: only x**2 implemented so far for powers");
+                        }
+                    } else {
+                        throw CodeGenError("RealBinop: only x**2 implemented so far for powers");
+                    }
+                    break;
+                };
                 default: {
-                    // Todo: Implement Pow Operation
-                    throw CodeGenError("RealBinop: Pow Operation not yet implemented");
+                    throw CodeGenError("ICE RealBinop: unknown operation");
                 }
             }
         } else {
@@ -1164,6 +1231,11 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
     }
 
     void visit_FunctionCall(const ASR::FunctionCall_t &x) {
+        if (x.m_value) {
+            this->visit_expr(*x.m_value);
+            return;
+        }
+
         ASR::Function_t *fn = ASR::down_cast<ASR::Function_t>(ASRUtils::symbol_get_past_external(x.m_name));
 
         for (size_t i = 0; i < x.n_args; i++) {
@@ -1506,9 +1578,9 @@ class ASRToWASMVisitor : public ASR::BaseVisitor<ASRToWASMVisitor> {
     }
 
     void exit() {
-        // exit_code would be on stack, so add it to JavaScript Output buffer by printing it.
+        // exit_code would be on stack, so set this exit code using set_exit_code().
         // this exit code would be read by JavaScript glue code
-        wasm::emit_call(m_code_section, m_al, m_func_name_idx_map[get_hash(m_import_func_asr_map["print_i32"])]->index);
+        wasm::emit_call(m_code_section, m_al, m_func_name_idx_map[get_hash(m_import_func_asr_map["set_exit_code"])]->index);
         wasm::emit_unreachable(m_code_section, m_al); // raise trap/exception
     }
 
