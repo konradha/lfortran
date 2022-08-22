@@ -804,6 +804,16 @@ public:
             //char *name = down_cast<AttrNamelist_t>(x.m_attributes[0])->m_name;
             throw SemanticError("Namelists not implemented yet", x.base.base.loc);
         }
+
+        for (size_t i=0; i<x.n_syms; i++) {
+            AST::var_sym_t &s = x.m_syms[i];
+            std::string sym = to_lower(s.m_name);
+            std::cout << "var name " << i+1 << "/" << x.n_syms << ": " << sym << "\n";
+            if (intrinsic_procedures.is_intrinsic(sym)) {
+                std::cout << "have intrinsic function: " << sym << "\n";
+            }
+        }
+
         for (size_t i=0; i<x.n_attributes; i++) {
             if (AST::is_a<AST::AttrType_t>(*x.m_attributes[i])) {
                 throw SemanticError("Type must be declared first",
@@ -2530,6 +2540,19 @@ public:
                 return;
             }
         }
+        std::cout << "var_name is " << var_name << "\n";
+        std::cout << "datan is intrinsic " << (intrinsic_procedures.is_intrinsic("datan") ? "yes" : "no") << "\n";
+        std::cout << "atan is intrinsic " << (intrinsic_procedures.is_intrinsic("atan") ? "yes" : "no") << "\n";
+        // Vec<ASR::call_arg_t> args;
+        // visit_expr_list(x.m_args, x.n_args, args);
+        // std::cout << "num args " << x.n_args << "\n";
+        // for (size_t i=0;i<x.n_args;++i) {
+        //     std::cout << x.m_args[i] << " ";
+        // }
+        // std::cout << "\n";
+        // ASR::symbol_t* resolve_intrinsic_function(const Location &loc, const std::string &remote_sym) {
+        //     if (!intrinsic_procedures.is_intrinsic(remote_sym)) {
+
         ASR::symbol_t *f2 = ASRUtils::symbol_get_past_external(v);
         if (ASR::is_a<ASR::Function_t>(*f2)) {
             ASR::Function_t *f = ASR::down_cast<ASR::Function_t>(f2);
