@@ -597,6 +597,8 @@ struct FixedFormRecursiveDescent {
     }
 
     bool lex_body_statement(unsigned char *&cur) {
+        auto next = cur; next_line(next);
+        std::cout << tostr(cur, next);
         eat_label(cur);
         // if (has_terminal(cur)) return false;     
         if (lex_declaration(cur)) {
@@ -608,7 +610,7 @@ struct FixedFormRecursiveDescent {
             return true;
         }
         unsigned char *nline = cur; next_line(nline);
-        if (next_is(cur, "do") && contains(cur, nline, '=') && contains(cur, nline, '=')) {
+        if (next_is(cur, "do") && contains(cur, nline, '=') && contains(cur, nline, ',')) {
             lex_do(cur);
             return true;
         }
@@ -623,9 +625,10 @@ struct FixedFormRecursiveDescent {
             return true;
         }
 
-        /*
-         * explicitly DO NOT tokenize `CONTINUE`, `GO TO`
-         */
+        if (next_is(cur, "continue")) {
+            tokenize_line("", cur);
+            return true;
+        }
 
         if (next_is(cur, "call") && !contains(cur, nline, '=')) {
             tokenize_line("call", cur);
@@ -654,6 +657,11 @@ struct FixedFormRecursiveDescent {
 
         if (next_is(cur, "implicit")) {
             tokenize_line("implicit", cur);
+            return true;
+        }
+
+        if (next_is(cur, "stop")) {
+            tokenize_line("", cur);
             return true;
         }
 
@@ -954,6 +962,7 @@ struct FixedFormRecursiveDescent {
         while (*cur != '\0') {
             // eat_label(cur);
             next_line(next);
+            std::cout << tostr(cur, next);
             lex_global_scope_item(cur);
             next = cur;
         }
