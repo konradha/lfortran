@@ -263,6 +263,7 @@ std::vector<std::string> declarators{
             "real",
             "complex",
             "doubleprecision",
+            "doublecomplex",
             "external",
             "dimension",
             "character",
@@ -559,15 +560,32 @@ struct FixedFormRecursiveDescent {
     bool lex_declarator(unsigned char *&cur) {
         for(const auto& declarator : declarators) {
             if(next_is(cur, declarator)) {
-                tokens.push_back(identifiers_map[declarator]);
-                YYSTYPE y;
-                std::string decl(declarator);
-                y.string.from_str(m_a, decl);
-                stypes.push_back(y);
-                Location loc;
-                loc.first = t.cur - string_start;
-                loc.last = t.cur - string_start + declarator.size();
-                locations.push_back(loc);
+                if (declarator == "doublecomplex") {
+                    tokens.push_back(yytokentype::KW_DOUBLE);
+                    tokens.push_back(yytokentype::KW_COMPLEX);
+                    std::string dbl("double");
+                    std::string cmx("complex");
+                    YYSTYPE y1, y2;
+                    y1.string.from_str(m_a, dbl);
+                    y2.string.from_str(m_a, cmx);
+                    stypes.push_back(y1);
+                    stypes.push_back(y2);
+                    Location loc_dbl, loc_cmx;
+                    loc_dbl.first = t.cur - string_start; loc_dbl.last = t.cur - string_start + dbl.size();
+                    loc_cmx.first = loc_dbl.last; loc_dbl.last = loc_dbl.last + cmx.size();
+                    locations.push_back(loc_dbl);
+                    locations.push_back(loc_cmx);
+                } else {
+                    tokens.push_back(identifiers_map[declarator]);
+                    YYSTYPE y;
+                    std::string decl(declarator);
+                    y.string.from_str(m_a, decl);
+                    stypes.push_back(y);
+                    Location loc;
+                    loc.first = t.cur - string_start;
+                    loc.last = t.cur - string_start + declarator.size();
+                    locations.push_back(loc);
+                }
                 cur += declarator.size();
                 return true;
             }
@@ -654,6 +672,12 @@ struct FixedFormRecursiveDescent {
 
         if (next_is(cur, "implicit")) {
             tokenize_line("implicit", cur);
+            return true;
+        }
+
+        // procedure call
+        if (contains(cur, nline, '(') && contains(cur, nline, ')')) {
+            tokenize_line("", cur);
             return true;
         }
 
@@ -902,7 +926,7 @@ struct FixedFormRecursiveDescent {
         std::vector<std::string> function_keywords{"recursive", "pure",
             "elemental",
             "real", "character", "complex", "integer", "logical",
-            "doubleprecision"};
+            "doubleprecision", "double"};
 
         if (next_is(cur, "include")) tokenize_line("include", cur);
         if (is_program(cur)) {
