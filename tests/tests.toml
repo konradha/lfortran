@@ -2238,3 +2238,8 @@ ast = true
 [[test]]
 filename = "errors/arithmetic_if1.f90"
 asr = true
+
+[[test]]
+filename = "fixed_form_body_continue.f"
+asr = true
+ast = true

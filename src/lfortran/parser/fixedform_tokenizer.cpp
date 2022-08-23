@@ -623,9 +623,10 @@ struct FixedFormRecursiveDescent {
             return true;
         }
 
-        /*
-         * explicitly DO NOT tokenize `CONTINUE`, `GO TO`
-         */
+        if (next_is(cur, "continue") && !contains(cur, nline, '=') && !contains(cur, nline, ',')) {
+            tokenize_line("continue", cur);
+            return true;
+        }
 
         if (next_is(cur, "call") && !contains(cur, nline, '=')) {
             tokenize_line("call", cur);

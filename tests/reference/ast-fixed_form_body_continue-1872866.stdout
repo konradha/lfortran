@@ -1,0 +1,1 @@
+(TranslationUnit [(Program main () [] [] [(Declaration (AttrType TypeInteger [] () None) [] [(a [] [] () None ())] ())] [(If 0 () (>= 1 0) [(GoTo 0 () 20 [] ())] [] () () ()) (= 0 a 1 ()) (GoTo 0 () 30 [] ()) (Continue 20 ()) (= 0 a 0 ()) (Continue 30 ())] [])])
