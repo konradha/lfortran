@@ -179,27 +179,31 @@ void skip_rest_of_line(const std::string &s, size_t &pos)
 }
 
 // Parses string, including possible continuation lines
-void parse_string(std::string &out, const std::string &s, size_t &pos)
+void parse_string(std::string &out, const std::string &s, size_t &pos, size_t &curr_line_pos)
 {
     char quote = s[pos];
     LFORTRAN_ASSERT(quote == '"' || quote == '\'');
     out += s[pos];
     pos++;
-    while (pos < s.size() && ! (s[pos] == quote && s[pos+1] != quote)) {
+    while (pos < s.size() && ! (s[pos] == quote && s[pos+1] != quote) && curr_line_pos < 72) {
         if (s[pos] == '\n') {
             pos++;
             pos += 6;
+            curr_line_pos = 6;
             continue;
         }
         if (s[pos] == quote && s[pos+1] == quote) {
             out += s[pos];
             pos++;
+            curr_line_pos++;
         }
         out += s[pos];
         pos++;
+        curr_line_pos++;
     }
     out += s[pos]; // Copy the last quote
     pos++;
+    curr_line_pos++;
 }
 
 bool is_num(char c)
@@ -221,9 +225,21 @@ void copy_label(std::string &out, const std::string &s, size_t &pos)
 void copy_rest_of_line(std::string &out, const std::string &s, size_t &pos,
     LocationManager &lm)
 {
-    while (pos < s.size() && s[pos] != '\n') {
+    size_t curr_line_pos = 6;
+
+    auto p = pos; auto start = pos;
+    auto mini_curr = 6;
+    while(s[p++] != '\n') {
+        if (mini_curr++ > 71) break;
+    }
+    // std::cout << "curr line is: " << mini_curr << "\n";
+    // std::cout << "would print substring (size) " << p - start << "\n";
+    std::string A{s.substr(start, p-start)};
+    std::cout << A;
+
+    while (pos < s.size() && s[pos] != '\n' && curr_line_pos < 72) {
         if (s[pos] == '"' || s[pos] == '\'') {
-            parse_string(out, s, pos);
+            parse_string(out, s, pos, curr_line_pos);
         } else if (s[pos] == '!') {
             skip_rest_of_line(s, pos);
             out += '\n';
@@ -231,12 +247,14 @@ void copy_rest_of_line(std::string &out, const std::string &s, size_t &pos,
         } else if (s[pos] == ' ') {
             // Skip white space in a fixed-form parser
             pos++;
+            curr_line_pos++;
             lm.out_start.push_back(out.size());
             lm.in_start.push_back(pos);
         } else {
             // Copy the character, but covert to lowercase
             out += tolower(s[pos]);
             pos++;
+            curr_line_pos++;
         }
     }
     out += s[pos]; // Copy the last `\n'

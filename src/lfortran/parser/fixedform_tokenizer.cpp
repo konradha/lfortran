@@ -299,6 +299,7 @@ struct FixedFormRecursiveDescent {
     std::vector<YYSTYPE> stypes;
     std::vector<int> tokens;
     std::vector<Location> locations;
+    bool tokenize_if = false;
 
     FixedFormRecursiveDescent(diag::Diagnostics &diag,
         Allocator &m_a) : diag{diag}, m_a{m_a} {
@@ -623,9 +624,10 @@ struct FixedFormRecursiveDescent {
             return true;
         }
 
-        /*
-         * explicitly DO NOT tokenize `CONTINUE`, `GO TO`
-         */
+        if (!tokenize_if && next_is(cur, "continue")) {
+            tokenize_line("", cur);
+            return true;
+        }
 
         if (next_is(cur, "call") && !contains(cur, nline, '=')) {
             tokenize_line("call", cur);
@@ -778,11 +780,13 @@ struct FixedFormRecursiveDescent {
     }
 
     void lex_if(unsigned char *&cur) {
+        tokenize_if = true;
         tokenize_line("if", cur);
         // check if it's a single line if statement
         // take the second-to-last as we MAYBE tokens = {..., "THEN", "newline"}
         if (tokens[tokens.size()-2] != yytokentype::KW_THEN) return;
         while(if_advance_or_terminate(cur));
+        tokenize_if = false;
     }
 
     void lex_subroutine(unsigned char *&cur) {
@@ -806,6 +810,9 @@ struct FixedFormRecursiveDescent {
         } else if (next_is(cur, "end")) {
             tokenize_line("end", cur);
         } else {
+            for (size_t i = 0; i< tokens.size();++i) {
+                std::cout << pickle(tokens[i], stypes[i])<< "\n";
+            }
             error(cur, "Expecting terminating symbol for program");
         }
     }
