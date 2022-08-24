@@ -170,6 +170,7 @@ void yyerror(YYLTYPE *yyloc, LFortran::Parser &p, const std::string &msg)
 %token <string> KW_DO
 %token <string> KW_DOWHILE
 %token <string> KW_DOUBLE
+%token <string> KW_DOUBLE_COMPLEX
 %token <string> KW_DOUBLE_PRECISION
 %token <string> KW_ELEMENTAL
 %token <string> KW_ELSE
@@ -1369,6 +1370,9 @@ var_type
     | KW_LOGICAL { $$ = ATTR_TYPE(Logical, @$); }
     | KW_LOGICAL "(" kind_arg_list ")" { $$ = ATTR_TYPE_KIND(Logical, $3, @$); }
     | KW_LOGICAL "*" TK_INTEGER { $$ = ATTR_TYPE_INT(Logical, $3, @$); }
+    | KW_DOUBLE_COMPLEX { $$ = ATTR_TYPE(Complex, @$); }
+    | KW_DOUBLE_COMPLEX "(" kind_arg_list ")" { $$ = ATTR_TYPE_KIND(Complex, $3, @$); }
+    | KW_DOUBLE_COMPLEX "*" TK_INTEGER { $$ = ATTR_TYPE_INT(Complex, $3, @$); }
     | KW_DOUBLE KW_PRECISION { $$ = ATTR_TYPE(DoublePrecision, @$); }
     | KW_DOUBLE_PRECISION { $$ = ATTR_TYPE(DoublePrecision, @$); }
     | KW_TYPE "(" id ")" { $$ = ATTR_TYPE_NAME(Type, $3, @$); }
@@ -2336,6 +2340,7 @@ id
     | KW_DO { $$ = SYMBOL($1, @$); }
     | KW_DOWHILE { $$ = SYMBOL($1, @$); }
     | KW_DOUBLE { $$ = SYMBOL($1, @$); }
+    | KW_DOUBLE_COMPLEX { $$ = SYMBOL($1, @$); }
     | KW_DOUBLE_PRECISION { $$ = SYMBOL($1, @$); }
     | KW_ELEMENTAL { $$ = SYMBOL($1, @$); }
     | KW_ELSE { $$ = SYMBOL($1, @$); }
