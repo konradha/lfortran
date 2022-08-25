@@ -910,7 +910,7 @@ public:
                         }
                     }
                 // enable sole `dimension` attribute
-            } else if (AST::is_a<AST::AttrDimension_t>(*x.m_attributes[i])) {
+            } else if (AST::is_a<AST::AttrDimension_t>(*x.m_attributes[0])) {
                     for (size_t i=0;i<x.n_syms;++i) { // symbols for line only
                         AST::var_sym_t &s = x.m_syms[i];
                         std::string sym = to_lower(s.m_name);
@@ -943,7 +943,7 @@ public:
                             throw SemanticError("Cannot attribute non-variable type with dimension", x.base.base.loc);
                         }
                     }
-                } else if (AST::is_a<AST::AttrData_t>(*x.m_attributes[i])) {
+                } else if (AST::is_a<AST::AttrData_t>(*x.m_attributes[0])) {
                     // Example:
                     // data x, y / 1.0, 2.0 /
                     AST::AttrData_t *a = AST::down_cast<AST::AttrData_t>(x.m_attributes[i]);
@@ -1009,7 +1009,12 @@ public:
                         ASR::Variable_t *v2 = ASR::down_cast<ASR::Variable_t>(v->m_v);
                         v2->m_value = value;
                     }
-                } else {
+                } /*else if (AST::is_a<AST::AttrParameter>(x.m_attributes[i])) {
+                    throw SemanticError("TODO: implement sole parameter attribute",
+                        x.base.base.loc);
+                }*/ else {
+                    AST::SimpleAttribute_t *sa =
+                        AST::down_cast<AST::SimpleAttribute_t>(x.m_attributes[0]);
                     throw SemanticError("Attribute declaration not supported",
                         x.base.base.loc);
                 }
