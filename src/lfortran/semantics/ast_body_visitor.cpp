@@ -1018,6 +1018,10 @@ public:
         current_scope = old_scope;
         tmp = nullptr;
     }
+    
+    void visit_Assign(const AST::Assign_t &x) {
+        
+    }
 
     void visit_Assignment(const AST::Assignment_t &x) {
         this->visit_expr(*x.m_target);

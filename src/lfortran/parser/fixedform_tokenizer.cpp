@@ -576,6 +576,49 @@ struct FixedFormRecursiveDescent {
                 continue;
             }
 
+            if (match_levels == 0 && tokens[tokens.size()-1] == yytokentype::TK_RPAREN && next_is(t.cur, "assign")) {
+                // ASSIGN 9999 TO VAR
+                // ->
+                // assign9999tovar
+                // -> manually tokenize
+                
+                
+                YYSTYPE y3;
+                std::string l("assign"); 
+                y3.string.from_str(m_a, l);
+                stypes.push_back(y3);
+                tokens.push_back(yytokentype::KW_ASSIGN);
+                Location loc_local;
+                // this needs to be checked
+                loc_local.first = t.tok+1 - t.string_start;
+                loc_local.last = t.cur+l.size() - t.string_start-1;
+                t.tok = t.cur;
+                t.cur += l.size();
+                locations.push_back(loc_local);
+                // set it back
+                match_levels = -1;
+                
+                
+                t.tok += l.size();
+                eat_label_inline(t.cur);
+                while (*t.cur >= '0' && *t.cur <= '9') t.cur++;
+                t.cur--; // advance 1 too much
+               
+                
+                
+                l = "to";
+                y3.string.from_str(m_a, l);
+                stypes.push_back(y3);
+                tokens.push_back(yytokentype::KW_TO);
+                loc_local.first = t.tok+1 - t.string_start;
+                loc_local.last = t.cur+l.size() - t.string_start-1;
+                locations.push_back(loc_local);
+
+                t.tok = t.cur;
+                t.cur += l.size();
+                continue;
+            }
+
 
             auto token = t.lex(m_a, y2, loc, diag);
             if (match_levels > -1 && token == yytokentype::TK_LPAREN) {
@@ -753,6 +796,17 @@ struct FixedFormRecursiveDescent {
 
         if (next_is(cur, "intrinsic")) {
             tokenize_line("intrinsic", cur);
+            return true;
+        }
+
+        if (next_is(cur, "assign")) {
+            auto move_ahead = cur;
+            move_ahead += std::string("assign").size();
+            while (*move_ahead >= '0' && *move_ahead <= '9') move_ahead++;
+            if (!(next_is(move_ahead, "to"))) {
+                return false;
+            }
+            tokenize_line("assign", cur);
             return true;
         }
 
