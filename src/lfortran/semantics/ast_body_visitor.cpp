@@ -1020,7 +1020,13 @@ public:
     }
     
     void visit_Assign(const AST::Assign_t &x) {
-        
+        std::cout << "in visit_Assign: x.m_variable is " << x.m_variable << "\n";
+        std::cout << "label is " << x.m_assign_label << "\n";
+        auto name = std::string(x.m_variable);
+        auto sym = current_scope->get_symbol(name);
+        if (sym == nullptr) throw SemanticError("Need to define `GOTO` target first before `ASSIGN`ing to it.", x.base.base.loc);
+        // should throw error
+
     }
 
     void visit_Assignment(const AST::Assignment_t &x) {
@@ -1610,6 +1616,24 @@ public:
                 throw SemanticError("A goto label must be an integer",
                     x.base.base.loc);
             }
+        } else if (x.m_int_var) {
+            auto label_name = std::string(x.m_int_var);
+            LFortran::ASRUtils::EXPR ???
+            // TODO
+            // 1. set up variable (make extra table to be sure?)
+            // 2. update this variable in symtab with current value
+            // 3. STRONG integration testing for this one
+            ASR::asr_t *v = ASR::make_Variable_t(al, x.base.base.loc, current_scope,
+                                                 x.m_int_var, ASR::intentType::Local,
+                                                 nullptr, nullptr,
+                                                 tmp_storage,
+                                                 tmp_type,
+                                                 ASR::abiType::Source,
+                                                 ASR::accessType::Private,
+                                                 ASR::presenceType::Required,
+                                                 false);
+            // make it a variable that we have next to all other variables (????)
+            // then, when ASSIGN XX TO VAR -> change the value in the 
         } else {
             throw SemanticError("Only 'goto INTEGER' is supported currently",
                 x.base.base.loc);
