@@ -886,6 +886,11 @@ struct FixedFormRecursiveDescent {
             tokenize_line("continue", cur);
             return false;
         }
+
+        if (next_is(cur, "return")) {
+            tokenize_line("return", cur);
+            return true;
+        }
         lex_body_statement(cur);
         return true;
     }
@@ -902,6 +907,12 @@ struct FixedFormRecursiveDescent {
         } else if (next_is(cur, "end")) {
             tokenize_line("end", cur);
         } else {
+            for (size_t i = 0; i< tokens.size();++i) {
+                std::cout << pickle(tokens[i], stypes[i])<< "\n";
+            }
+            std::cout << "last line:\n";
+            auto next = cur; next_line(next);
+            std::cout << tostr(cur, next);
             error(cur, "Expecting terminating symbol for subroutine");
         }
     }
