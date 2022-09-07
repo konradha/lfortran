@@ -273,7 +273,7 @@ std::vector<std::string> declarators{
 
 std::vector<std::string> lines{};
 
-std::vector<std::string> io_names{"open", "read", "write", "format", "close", "print"};
+std::vector<std::string> io_names{"open", "read", "write", "close", "print"};
 
 void FixedFormTokenizer::set_string(const std::string &str)
 {
@@ -683,6 +683,32 @@ struct FixedFormRecursiveDescent {
         return false;
     }
 
+    void lex_format(unsigned char *&cur) {
+        // move after "format"
+        // unsigned char *cpy = cur; next_line(cur);
+        YYSTYPE y2;
+        std::string l("format");
+        y2.string.from_str(m_a, l);
+        stypes.push_back(y2);
+        tokens.push_back(yytokentype::TK_FORMAT);
+        Location loc;
+        loc.first = cur - string_start;
+        loc.last = cur - string_start + l.size();
+        locations.push_back(loc);
+
+        cur += l.size();
+        l = "\n";
+        y2.string.from_str(m_a, l);
+        stypes.push_back(y2);
+        tokens.push_back(yytokentype::TK_NEWLINE);
+        loc.first = cur - string_start;
+        loc.last = cur - string_start + l.size();
+        locations.push_back(loc);
+       
+        while(*cur != '\n') cur++;
+        if (*cur == '\n') cur++;
+    }
+
     bool lex_body_statement(unsigned char *&cur) {
         eat_label(cur);
         if (lex_declaration(cur)) {
@@ -693,6 +719,7 @@ struct FixedFormRecursiveDescent {
             lex_cond(cur);
             return true;
         }
+        // auto next = cur; next_line(next); std::cout << tostr(cur, next);
         unsigned char *nline = cur; next_line(nline);
         if (next_is(cur, "do") && contains(cur, nline, '=') && contains(cur, nline, '=')) {
             lex_do(cur);
@@ -753,6 +780,10 @@ struct FixedFormRecursiveDescent {
 
         if (next_is(cur, "intrinsic")) {
             tokenize_line("intrinsic", cur);
+            return true;
+        }
+        if (next_is(cur, "format")) {
+            lex_format(cur);
             return true;
         }
 
@@ -915,6 +946,10 @@ struct FixedFormRecursiveDescent {
         } else if (next_is(cur, "end")) {
             tokenize_line("end", cur);
         } else {
+            for (size_t i = 0; i< tokens.size();++i) {
+                std::cout << pickle(tokens[i], stypes[i])<< "\n";
+            }
+            auto next = cur; next_line(next); std::cout << tostr(cur, next);
             error(cur, "Expecting terminating symbol for program");
         }
     }
@@ -1115,6 +1150,8 @@ int FixedFormTokenizer::lex(Allocator &/*al*/, YYSTYPE &yylval,
         return yytokentype::END_OF_FILE;
     }
 }
+
+
 
 
 } // namespace LFortran
