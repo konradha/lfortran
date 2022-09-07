@@ -1020,13 +1020,33 @@ public:
     }
     
     void visit_Assign(const AST::Assign_t &x) {
-        std::cout << "in visit_Assign: x.m_variable is " << x.m_variable << "\n";
-        std::cout << "label is " << x.m_assign_label << "\n";
+        std::cout << "ASSIGN " << x.m_assign_label << " TO " << x.m_variable << "\n";
         auto name = std::string(x.m_variable);
         auto sym = current_scope->get_symbol(name);
-        if (sym == nullptr) throw SemanticError("Need to define `GOTO` target first before `ASSIGN`ing to it.", x.base.base.loc);
-        // should throw error
+        if (sym == nullptr) {
+            ASR::ttype_t *int32_type = LFortran::ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc, 4, nullptr, 0));
+            ASR::expr_t* const_LABEL = LFortran::ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc, x.m_assign_label, int32_type));
+            auto s = s2c(al, name);
+            ASR::ttype_t* tmp_type = ASRUtils::expr_type(const_LABEL);
+            ASR::storage_typeType tmp_storage = ASR::storage_typeType::Default;
+            ASR::asr_t *v = ASR::make_Variable_t(al, x.base.base.loc, current_scope,
+                                                 s, ASR::intentType::Local,
+                                                 nullptr, nullptr,
+                                                 tmp_storage,
+                                                 tmp_type,
+                                                 ASR::abiType::Source,
+                                                 ASR::accessType::Private,
+                                                 ASR::presenceType::Required,
+                                                 false); 
+            current_scope->add_symbol(name, ASR::down_cast<ASR::symbol_t>(v));
 
+            // make_Assignment() ???
+        } else {
+            // ASR::ttype_t *int32_type = LFortran::ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc, 4, nullptr, 0));
+            // ASR::expr_t* const_LABEL = LFortran::ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc, x.m_assign_label, int32_type));
+
+            // make_Assignment () ???
+        }
     }
 
     void visit_Assignment(const AST::Assignment_t &x) {
@@ -1578,7 +1598,7 @@ public:
                 auto sym_name = std::string(name->m_id);
                 auto sym = current_scope->resolve_symbol(sym_name);
                 if (sym == nullptr) {
-                    throw SemanticError("Cannot do `GOTO select` for undeclared variable",
+                    throw SemanticError("Cannot do `GOTO SELECT` for undeclared variable",
                         x.base.base.loc);
                 }
                 if (!ASR::is_a<ASR::Variable_t>(*sym)) {
@@ -1618,22 +1638,15 @@ public:
             }
         } else if (x.m_int_var) {
             auto label_name = std::string(x.m_int_var);
-            LFortran::ASRUtils::EXPR ???
-            // TODO
-            // 1. set up variable (make extra table to be sure?)
-            // 2. update this variable in symtab with current value
-            // 3. STRONG integration testing for this one
-            ASR::asr_t *v = ASR::make_Variable_t(al, x.base.base.loc, current_scope,
-                                                 x.m_int_var, ASR::intentType::Local,
-                                                 nullptr, nullptr,
-                                                 tmp_storage,
-                                                 tmp_type,
-                                                 ASR::abiType::Source,
-                                                 ASR::accessType::Private,
-                                                 ASR::presenceType::Required,
-                                                 false);
-            // make it a variable that we have next to all other variables (????)
-            // then, when ASSIGN XX TO VAR -> change the value in the 
+            auto var = current_scope->get_symbol(label_name);
+            if (var == nullptr) throw SemanticError("Goto label needs to be declared somewhere",
+                    x.base.base.loc);
+            if (ASR::is_a<ASR::Variable_t>(*var)) {
+                std::cout << "found variable " << ASR::down_cast<ASR::Variable_t>(var)->m_name << "\n";
+                throw SemanticError("DONE", x.base.base.loc);
+            }
+            
+
         } else {
             throw SemanticError("Only 'goto INTEGER' is supported currently",
                 x.base.base.loc);
