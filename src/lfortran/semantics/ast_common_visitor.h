@@ -904,6 +904,10 @@ public:
                                     // TODO
                                     throw SemanticError("Attribute declaration not "
                                         "supported yet", x.base.base.loc);
+                                } else if (sa->m_attr == AST::simple_attributeType
+                                        ::AttrCommon) {
+                                    std::cout << "block name is " << s.m_name << "\n";
+                                    throw SemanticError("actual err", x.base.base.loc);
                                 } else {
                                     throw SemanticError("Attribute declaration not "
                                             "supported", x.base.base.loc);
@@ -1108,6 +1112,10 @@ public:
                             } else if(sa->m_attr == AST::simple_attributeType
                                     ::AttrIntrinsic) {
                                 excluded_from_symtab.push_back(sym);
+                            } else if(sa->m_attr == AST::simple_attributeType
+                                    ::AttrCommon) {
+                                throw SemanticError("Caught COMMON",
+                                        x.base.base.loc);
                             } else {
                                 throw SemanticError("Attribute type not implemented yet",
                                         x.base.base.loc);
