@@ -23,6 +23,10 @@ namespace LFortran {
             llvm::Type *t = x->getType();
             LFORTRAN_ASSERT(t->isPointerTy());
             llvm::Type *t2 = t->getContainedType(0);
+            // std::cout << t << "\n";
+            if (x->hasName()) {
+                std::cout << x->getValueName()->first() << "\n";
+            }
             return builder.CreateGEP(t2, x, idx);
         }
 
