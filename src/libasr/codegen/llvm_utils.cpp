@@ -24,9 +24,18 @@ namespace LFortran {
             LFORTRAN_ASSERT(t->isPointerTy());
             llvm::Type *t2 = t->getContainedType(0);
             // std::cout << t << "\n";
-            if (x->hasName()) {
-                std::cout << x->getValueName()->first() << "\n";
-            }
+            llvm::raw_ostream &output = llvm::outs();
+            
+            // output << "(outer)   "; t->print(output); output << "\n";
+            // output << "(inner)   "; t2->print(output);output << "\n";
+            
+
+            output << "(value)   ";x->print(output);output << "\n";
+            output << "(wrapped) ";
+            for (const auto &val : idx) {
+                val->print(output); output << " ";
+            }output << "\n\n";
+
             return builder.CreateGEP(t2, x, idx);
         }
 
