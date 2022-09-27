@@ -1,0 +1,13 @@
+{
+    "basename": "asr-function_keywords-dce5f27",
+    "cmd": "lfortran --indent --fixed-form --show-asr --no-color {infile} -o {outfile}",
+    "infile": "tests/fixed_form/function_keywords.f",
+    "infile_hash": "93e87638f8bc162a984d073c23fa0b6e7df7f2feb462866a95993366",
+    "outfile": null,
+    "outfile_hash": null,
+    "stdout": null,
+    "stdout_hash": null,
+    "stderr": "asr-function_keywords-dce5f27.stderr",
+    "stderr_hash": "dc69f90826b8655526c9919a26825d60d4fb79b4aa744951a1938e88",
+    "returncode": 1
+}
