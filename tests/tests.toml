@@ -2399,3 +2399,8 @@ asr_implicit_interface = true
 filename = "fixed_form_goto_select.f"
 ast = true
 asr = true
+
+[[test]]
+filename = "fixed_form/scipy_else_bug.f"
+ast = true
+asr_implicit_interface = true

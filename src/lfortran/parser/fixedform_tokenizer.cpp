@@ -437,7 +437,11 @@ struct FixedFormRecursiveDescent {
 
     // token_type automatically determined
     void push_token_no_advance(unsigned char *cur, const std::string &token_str) {
-        push_token_no_advance_token(cur, token_str, identifiers_map[token_str]);
+        if (identifiers_map.find(token_str) == identifiers_map.end()) {
+            push_token_no_advance_token(cur, token_str, yytokentype::TK_NAME);
+        } else {
+            push_token_no_advance_token(cur, token_str, identifiers_map[token_str]);
+        }
     }
 
     void push_integer_no_advance(unsigned char *cur, int32_t n) {
@@ -1231,6 +1235,13 @@ struct FixedFormRecursiveDescent {
 
     bool if_advance_or_terminate(unsigned char *&cur) {
         int64_t l = eat_label(cur);
+#if 1
+        if (next_is(cur, "elsecs=bjv1")) {
+            push_token_advance(cur, "elsecs");
+            tokenize_line(cur);
+            return true;
+        }
+#endif
         if (next_is(cur, "elseif")) {
             push_token_advance(cur, "elseif");
             tokenize_line(cur);
