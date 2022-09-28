@@ -669,6 +669,8 @@ public:
     std::map<std::string, std::vector<ASR::asr_t*>> template_type_parameters;
     std::vector<ASR::asr_t*> current_template_type_parameters;
     std::unordered_set<int> current_procedure_used_type_parameter_indices;
+    
+    std::map<std::string, int64_t> labels_in_scope;
 
     Vec<char*> data_member_names;
 

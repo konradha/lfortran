@@ -996,6 +996,7 @@ public:
         }
         ASR::Function_t *v = ASR::down_cast<ASR::Function_t>(t);
         current_scope = v->m_symtab;
+        
         Vec<ASR::stmt_t*> body;
         body.reserve(al, x.n_body);
         transform_stmts(body, x.n_body, x.m_body);
@@ -1017,6 +1018,39 @@ public:
 
         current_scope = old_scope;
         tmp = nullptr;
+    }
+
+    void visit_Assign(const AST::Assign_t &x) {
+        std::cout << "var: " << x.m_variable << " label: " << x.m_assign_label << "\n";
+        // std::string var_name = std::string{x.m_variable} + "_LFORTRAN_LABEL";
+        // auto v = current_scope->resolve_symbol(var_name);
+        // if (!v) {
+        //     Vec<ASR::expr_t*> number;
+        //     number.reserve(al, 1);
+        //     ASR::ttype_t *int64_type = LFortran::ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc, 8, nullptr, 0));
+        //     number.push_back(al, LFortran::ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc, x.m_assign_label, int64_type)));
+
+        //     std::string name = to_lower(var_name);
+        //     auto asr_v = ASR::make_Variable_t(al, x.base.base.loc, current_scope,
+        //                                          s2c(al, name), ASR::intentType::Local,
+        //                                          nullptr, nullptr,
+        //                                          ASR::storage_typeType::Default,
+        //                                          int64_type,
+        //                                          ASR::abiType::Source,
+        //                                          ASR::accessType::Private,
+        //                                          ASR::presenceType::Required,
+        //                                          false);
+        //     current_scope->add_symbol(var_name, asr_v);
+        // } else {
+        //     if (!ASR::is_a<ASR::Variable_t>(v)) {
+        //         throw SemanticError("this does not work", x.base.base.loc);
+        //     }
+
+        //     auto var = ASR::down_cast<ASR::Variable_t>(v);
+        //     this->visit_expr(var->m_value);
+        //     old_var_expr->
+        // }
+
     }
 
     void visit_Assignment(const AST::Assignment_t &x) {
@@ -1607,9 +1641,10 @@ public:
                 ASR::expr_t* target_var = ASRUtils::EXPR(ASR::make_Var_t(al, x.base.base.loc, sym));
                 tmp = ASR::make_Select_t(al, x.base.base.loc, target_var, a_body_vec.p,
                            a_body_vec.size(), def_body.p, def_body.size());
-            } else {           
-                throw SemanticError("A goto label must be an integer",
-                    x.base.base.loc);
+            } else {
+                std::cout << "getting here\n";
+                // throw SemanticError("A goto label must be an integer",
+                //     x.base.base.loc);
             }
         } else {
             throw SemanticError("Only 'goto INTEGER' is supported currently",
