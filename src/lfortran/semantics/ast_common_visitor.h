@@ -1030,6 +1030,8 @@ public:
             for (size_t i=0; i<x.n_syms; i++) {
                 AST::var_sym_t &s = x.m_syms[i];
                 std::string sym = to_lower(s.m_name);
+                auto intrin = resolve_intrinsic_function(x.m_syms[i].loc, x.m_syms[i].m_name);
+                if (intrin != nullptr) continue;
                 ASR::accessType s_access = dflt_access;
                 ASR::presenceType s_presence = dflt_presence;
                 bool value_attr = false;
