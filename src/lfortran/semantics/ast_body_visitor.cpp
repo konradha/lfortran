@@ -455,6 +455,87 @@ public:
         }
     }
 
+    void visit_DataImpliedDo(const AST::DataImpliedDo_t &x) {
+
+
+        // const static exprType class_type = exprType::DataImpliedDo;
+        // typedef expr_t parent_type;
+        // expr_t base;
+        // expr_t** m_object_list; size_t n_object_list; // Sequence
+        // ??decl_attribute_t* m_type;
+        // !!char* m_var;
+        // !!expr_t* m_start;
+        // !!expr_t* m_end;
+        // !!expr_t* m_increment;
+
+        std::string loop_var_name = to_lower(x.m_var);
+        std::cout << "var name is " << loop_var_name << "\n";
+        std::cout << "num objects: " << x.n_object_list << "\n";
+
+        auto start = AST::down_cast<AST::Num_t>(x.m_start);
+        auto end = AST::down_cast<AST::Num_t>(x.m_end);
+        AST::Num_t *incr = nullptr;
+        if (x.m_increment != nullptr && AST::is_a<AST::Num_t>(*x.m_increment)) {
+            incr = AST::down_cast<AST::Num_t>(x.m_increment);
+        } else {
+            // no increment, we leave it as nullptr
+            // auto sym = AST::make_Num_t(al, x.base.base.loc, 1, nullptr);
+            // incr = AST::down_cast<AST::Num_t>(sym);
+        }
+
+        // DataImpliedDo
+        std::cout << "start is " << start->m_n << "\n";
+        std::cout << "end is " << end->m_n << "\n";
+        if (incr != nullptr)
+            std::cout << "incr is " << incr->m_n << "\n";
+
+        // if (!AST::is_a<AST::simple_attributeType::AttrNon_Intrinsic>(x.m_type)) {
+        //     std::cout << "Non_Intrinsic attr!\n";
+        // }
+
+        std::cout << "num objects going in: " << x.n_object_list << "\n";
+        for (size_t i = 0; i < x.n_object_list; ++i) {
+            auto obj = x.m_object_list[i];
+            // if (AST::is_a<AST::BinOp_t>(*obj)) std::cout << "yes, it's BinOp\n";
+            // if (AST::is_a<AST::BoolOp_t>(*obj)) std::cout << "yes, it's BoolOp\n";
+            // if (AST::is_a<AST::DefBinOp_t>(*obj)) std::cout << "yes, it's DefBinOp\n";
+            // if (AST::is_a<AST::Num_t>(*obj)) std::cout << "yes, it's Num\n";
+            if (AST::is_a<AST::FuncCallOrArray_t>(*obj)) {
+                auto arr = AST::down_cast<AST::FuncCallOrArray_t>(obj);
+                Vec<ASR::call_arg_t> args;
+                visit_expr_list(arr->m_args, arr->n_args, args);
+
+                for (size_t i = 0; i< args.n; ++i) {
+                    std::cout << args[i].m_value << " ";
+                }
+                std::cout << "\n";
+                
+                std::string array = to_lower(arr->m_func);
+                auto sym = current_scope->resolve_symbol(array);
+                if (sym == nullptr) continue; //throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
+                if (ASR::is_a<ASR::Variable_t>(*sym)) {
+                    auto var = ASR::down_cast<ASR::Variable_t>(sym);
+                    std::cout << "variable is " << var->m_name << "\n";
+                }
+            } else {
+                std::cout << "type is " << obj->type << "\n";
+            }
+        }
+
+        size_t iter = 1;
+        if (incr != nullptr) iter = incr->m_n;
+
+        for (size_t i = start->m_n; i <= end->m_n; i += iter) {
+            std::cout << "iter " << i << " of " << end->m_n << "\n";
+            // ASR::make_ArrayItem_t()
+        }
+
+
+
+        auto sym = current_scope->resolve_symbol(loop_var_name);
+        if (sym != nullptr) throw SemanticError("Data Statement variable not declared.", x.base.base.loc);
+    }
+
     void visit_Inquire(const AST::Inquire_t& x) {
         std::map<std::string, size_t> argname2idx = {
             {"unit", 0}, {"file", 1}, {"iostat", 2}, {"err", 3},
