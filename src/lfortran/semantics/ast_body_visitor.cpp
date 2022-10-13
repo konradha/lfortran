@@ -7,6 +7,8 @@
 #include <cmath>
 #include <set>
 
+#include <cstdio>
+
 #include <lfortran/ast.h>
 #include <libasr/asr.h>
 #include <libasr/asr_utils.h>
@@ -455,7 +457,7 @@ public:
         }
     }
 
-    void visit_DataImpliedDo(const AST::DataImpliedDo_t &x) {
+    void visit_DataImpliedDo(const AST::DataImpliedDo_t &x, const char* str = __builtin_FUNCTION()) {
 
 
         // const static exprType class_type = exprType::DataImpliedDo;
@@ -468,7 +470,11 @@ public:
         // !!expr_t* m_end;
         // !!expr_t* m_increment;
 
+        std::cout << "visit_DataImpliedDo called by: " << str << "\n";
+
         std::string loop_var_name = to_lower(x.m_var);
+        // auto sym = current_scope->resolve_symbol(array);
+        // if (sym != nullptr) throw SemanticError("Data statement loop variable cannot be have same name as other variable.", x.base.base.loc);
         std::cout << "var name is " << loop_var_name << "\n";
         std::cout << "num objects: " << x.n_object_list << "\n";
 
@@ -504,11 +510,36 @@ public:
                 auto arr = AST::down_cast<AST::FuncCallOrArray_t>(obj);
                 Vec<ASR::call_arg_t> args;
                 visit_expr_list(arr->m_args, arr->n_args, args);
-
+                // arr!!!
+                // fnarg_t* m_args;
+                // keyword_t* m_keywords;
+                // fnarg_t* m_subargs;
+                std::cout << "args[i].m_value\n";
                 for (size_t i = 0; i< args.n; ++i) {
-                    std::cout << args[i].m_value << " ";
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*(args[i].m_value))) {
+                        auto num = ASR::down_cast<ASR::IntegerConstant_t>(args[i].m_value);
+                        std::cout << "num " << i << " is " << num->m_n << "\n";
+                    } else if (ASR::is_a<ASR::Var_t>(*(args[i].m_value))) {
+                        auto var = ASR::down_cast<ASR::Var_t>(args[i].m_value);
+                        if (ASR::is_a<ASR::Variable_t>(*var->m_v)) {
+                            auto variable = ASR::down_cast<ASR::Variable_t>(var->m_v);
+                            std::cout << "variable " << i  << " is " << variable->m_name << "\n";
+                            if (loop_var_name != variable->m_name) throw SemanticError("Need to have consistent loop variable in data statement", x.base.base.loc);
+                        }
+                    } else {
+                        throw SemanticError("Can only assign to variables and integers in data statement", x.base.base.loc);
+                    }
                 }
                 std::cout << "\n";
+
+                // std::cout << "keywords\n";
+                // for (size_t i = 0; i < arr->n_keywords; ++i ) {
+                //     std::string curr_kwarg_name = to_lower(arr->m_keywords[i].m_arg);
+                //     std::cout << curr_kwarg_name << " ";
+                // }
+                // std::cout << "\n";
+
+
                 
                 std::string array = to_lower(arr->m_func);
                 auto sym = current_scope->resolve_symbol(array);
