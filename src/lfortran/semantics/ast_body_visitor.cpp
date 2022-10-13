@@ -457,113 +457,58 @@ public:
         }
     }
 
-    void visit_DataImpliedDo(const AST::DataImpliedDo_t &x, const char* str = __builtin_FUNCTION()) {
-
-
-        // const static exprType class_type = exprType::DataImpliedDo;
-        // typedef expr_t parent_type;
-        // expr_t base;
-        // expr_t** m_object_list; size_t n_object_list; // Sequence
-        // ??decl_attribute_t* m_type;
-        // !!char* m_var;
-        // !!expr_t* m_start;
-        // !!expr_t* m_end;
-        // !!expr_t* m_increment;
-
-        std::cout << "visit_DataImpliedDo called by: " << str << "\n";
-
+    void visit_DataImpliedDo(const AST::DataImpliedDo_t &x) {
         std::string loop_var_name = to_lower(x.m_var);
         // auto sym = current_scope->resolve_symbol(array);
         // if (sym != nullptr) throw SemanticError("Data statement loop variable cannot be have same name as other variable.", x.base.base.loc);
-        std::cout << "var name is " << loop_var_name << "\n";
-        std::cout << "num objects: " << x.n_object_list << "\n";
-
         auto start = AST::down_cast<AST::Num_t>(x.m_start);
         auto end = AST::down_cast<AST::Num_t>(x.m_end);
         AST::Num_t *incr = nullptr;
         if (x.m_increment != nullptr && AST::is_a<AST::Num_t>(*x.m_increment)) {
             incr = AST::down_cast<AST::Num_t>(x.m_increment);
-        } else {
-            // no increment, we leave it as nullptr
-            // auto sym = AST::make_Num_t(al, x.base.base.loc, 1, nullptr);
-            // incr = AST::down_cast<AST::Num_t>(sym);
         }
 
-        // DataImpliedDo
-        std::cout << "start is " << start->m_n << "\n";
-        std::cout << "end is " << end->m_n << "\n";
-        if (incr != nullptr)
-            std::cout << "incr is " << incr->m_n << "\n";
+        // std::array<{AST::FuncCallOrArray_t, std::array<std::variant<ASR::IntegerConstant, ASR::Variable_t>> of size (args.n-1)}>
 
-        // if (!AST::is_a<AST::simple_attributeType::AttrNon_Intrinsic>(x.m_type)) {
-        //     std::cout << "Non_Intrinsic attr!\n";
-        // }
-
-        std::cout << "num objects going in: " << x.n_object_list << "\n";
         for (size_t i = 0; i < x.n_object_list; ++i) {
             auto obj = x.m_object_list[i];
-            // if (AST::is_a<AST::BinOp_t>(*obj)) std::cout << "yes, it's BinOp\n";
-            // if (AST::is_a<AST::BoolOp_t>(*obj)) std::cout << "yes, it's BoolOp\n";
-            // if (AST::is_a<AST::DefBinOp_t>(*obj)) std::cout << "yes, it's DefBinOp\n";
-            // if (AST::is_a<AST::Num_t>(*obj)) std::cout << "yes, it's Num\n";
             if (AST::is_a<AST::FuncCallOrArray_t>(*obj)) {
                 auto arr = AST::down_cast<AST::FuncCallOrArray_t>(obj);
                 Vec<ASR::call_arg_t> args;
                 visit_expr_list(arr->m_args, arr->n_args, args);
-                // arr!!!
-                // fnarg_t* m_args;
-                // keyword_t* m_keywords;
-                // fnarg_t* m_subargs;
-                std::cout << "args[i].m_value\n";
                 for (size_t i = 0; i< args.n; ++i) {
                     if (ASR::is_a<ASR::IntegerConstant_t>(*(args[i].m_value))) {
                         auto num = ASR::down_cast<ASR::IntegerConstant_t>(args[i].m_value);
-                        std::cout << "num " << i << " is " << num->m_n << "\n";
                     } else if (ASR::is_a<ASR::Var_t>(*(args[i].m_value))) {
                         auto var = ASR::down_cast<ASR::Var_t>(args[i].m_value);
                         if (ASR::is_a<ASR::Variable_t>(*var->m_v)) {
                             auto variable = ASR::down_cast<ASR::Variable_t>(var->m_v);
-                            std::cout << "variable " << i  << " is " << variable->m_name << "\n";
                             if (loop_var_name != variable->m_name) throw SemanticError("Need to have consistent loop variable in data statement", x.base.base.loc);
                         }
                     } else {
                         throw SemanticError("Can only assign to variables and integers in data statement", x.base.base.loc);
                     }
-                }
-                std::cout << "\n";
+                } // coeff(i, i, 1) <- collect (`i`, 0); (`i`, 1) and (`1`, 2) [the symbol + the index to fill in]
 
-                // std::cout << "keywords\n";
-                // for (size_t i = 0; i < arr->n_keywords; ++i ) {
-                //     std::string curr_kwarg_name = to_lower(arr->m_keywords[i].m_arg);
-                //     std::cout << curr_kwarg_name << " ";
-                // }
-                // std::cout << "\n";
-
-
-                
+                // arr->m_func holds the array to assign to              
                 std::string array = to_lower(arr->m_func);
                 auto sym = current_scope->resolve_symbol(array);
-                if (sym == nullptr) continue; //throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
-                if (ASR::is_a<ASR::Variable_t>(*sym)) {
-                    auto var = ASR::down_cast<ASR::Variable_t>(sym);
-                    std::cout << "variable is " << var->m_name << "\n";
-                }
+                if (sym == nullptr) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
             } else {
-                std::cout << "type is " << obj->type << "\n";
+                throw SemanticError("Implied loop in data statement currently only supported for arrays.", x.base.base.loc);
             }
         }
 
-        size_t iter = 1;
-        if (incr != nullptr) iter = incr->m_n;
-
-        for (size_t i = start->m_n; i <= end->m_n; i += iter) {
-            std::cout << "iter " << i << " of " << end->m_n << "\n";
-            // ASR::make_ArrayItem_t()
-        }
+        // size_t iter = 1;
+        // if (incr != nullptr) iter = incr->m_n;
+        // for (size_t i = start->m_n; i <= end->m_n; i += iter) {
+        //     std::cout << "iter " << i << " of " << end->m_n << "\n";
+        // }
 
 
 
         auto sym = current_scope->resolve_symbol(loop_var_name);
+        // TODO: change to ==
         if (sym != nullptr) throw SemanticError("Data Statement variable not declared.", x.base.base.loc);
     }
 
