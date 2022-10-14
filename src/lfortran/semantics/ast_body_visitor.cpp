@@ -6,8 +6,7 @@
 #include <string>
 #include <cmath>
 #include <set>
-
-#include <cstdio>
+#include <variant>
 
 #include <lfortran/ast.h>
 #include <libasr/asr.h>
@@ -470,17 +469,23 @@ public:
 
         // std::array<{AST::FuncCallOrArray_t, std::array<std::variant<ASR::IntegerConstant, ASR::Variable_t>> of size (args.n-1)}>
 
+        std::map<AST::FuncCallOrArray_t *, std::vector<ASR::expr_t *> > func_calls;
+
         for (size_t i = 0; i < x.n_object_list; ++i) {
             auto obj = x.m_object_list[i];
             if (AST::is_a<AST::FuncCallOrArray_t>(*obj)) {
                 auto arr = AST::down_cast<AST::FuncCallOrArray_t>(obj);
+                func_calls[arr] = {};
                 Vec<ASR::call_arg_t> args;
                 visit_expr_list(arr->m_args, arr->n_args, args);
                 for (size_t i = 0; i< args.n; ++i) {
                     if (ASR::is_a<ASR::IntegerConstant_t>(*(args[i].m_value))) {
                         auto num = ASR::down_cast<ASR::IntegerConstant_t>(args[i].m_value);
+                        func_calls[arr].push_back((ASR::expr_t*)num);
+
                     } else if (ASR::is_a<ASR::Var_t>(*(args[i].m_value))) {
                         auto var = ASR::down_cast<ASR::Var_t>(args[i].m_value);
+                        func_calls[arr].push_back((ASR::expr_t*)var);
                         if (ASR::is_a<ASR::Variable_t>(*var->m_v)) {
                             auto variable = ASR::down_cast<ASR::Variable_t>(var->m_v);
                             if (loop_var_name != variable->m_name) throw SemanticError("Need to have consistent loop variable in data statement", x.base.base.loc);
@@ -490,6 +495,63 @@ public:
                     }
                 } // coeff(i, i, 1) <- collect (`i`, 0); (`i`, 1) and (`1`, 2) [the symbol + the index to fill in]
 
+                // collected all indices, can now fill in  
+                size_t iter = 1;
+                if (incr != nullptr) iter = incr->m_n;
+                auto els = func_calls[arr];
+                std::cout << "start = " << start->m_n << ", end = " << end->m_n << "\n";
+                std::vector<bool> marks(els.size(), false);
+
+                for (size_t i = 0; i < els.size(); ++i) {
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                        auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                        // std::cout << i << ": " << el->m_n << "\n";
+                    } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                        // everytime this one is encountered, the number of
+                        // combinations is multiplied by num_steps (ie. start=1, end=5, iter=1 -> num_steps=5)
+                        // and we have another range of possibilities we have to enter
+                        // arr(i, i, i, 1) with start=1 end=50 iter=10 has
+                        // arr(1, 1, 1, 1) ... arr(1, 11, 11, 1) ... arr(22, 33, 44, 1) etc
+                        // in this case: 125 entries to fill in
+                        auto el = ASR::down_cast<ASR::Var_t>(els[i]);
+                        auto var = ASR::down_cast<ASR::Variable_t>(el->m_v);
+                        marks[i] = true;
+                        // std::cout << i << ": " << var->m_name << "\n";
+                    }
+                }
+
+                std::vector<size_t> range{};
+                for (size_t i = start->m_n; i <= size_t(end->m_n); i += iter) range.push_back(i);
+                auto print = [&](std::vector<size_t> &c) {
+                    std::cout << "{"; for (const auto &el : c) std::cout << el << ",";
+                    std::cout << "} x ";
+                };
+
+                for (size_t i = 0; i < els.size(); ++i) {
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                        auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                        std::cout << "{" << el->m_n << "} x ";
+                    } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                        print(range);
+                    }
+                }
+
+
+
+
+                // for (size_t i = start->m_n; i <= size_t(end->m_n); i += iter) {
+                //     if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                //         auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                //         std::cout << i << ": " << el->m_n << "\n";
+                //     } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                //         auto el = ASR::down_cast<ASR::Var_t>(els[i]);
+                //         auto var = ASR::down_cast<ASR::Variable_t>(el->m_v);
+                //         std::cout << i << ": " << var->m_name << "\n";
+                //     } else {
+                //         std::cout << "we have a problem\n";
+                //     }
+                // }
+                
                 // arr->m_func holds the array to assign to              
                 std::string array = to_lower(arr->m_func);
                 auto sym = current_scope->resolve_symbol(array);
