@@ -943,8 +943,9 @@ public:
                     // y / 2 /
                     // or
                     // x(2) / 2 /
-                    //
+                    std::cout << "before visit_expr line" << __LINE__ << "\n";
                     this->visit_expr(*a->m_object[i]);
+                    std::cout << "after visit_expr line" << __LINE__ << "\n";
                     ASR::expr_t* object = LFortran::ASRUtils::EXPR(tmp);
                     this->visit_expr(*a->m_value[i]);
                     ASR::expr_t* value = LFortran::ASRUtils::EXPR(tmp);

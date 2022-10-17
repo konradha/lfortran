@@ -513,6 +513,9 @@ public:
                 auto els = func_calls[arr];
                 std::cout << "start = " << start->m_n << ", end = " << end->m_n << ", iter = " << iter << "\n";
 
+                // Vec<array_index_t> v_args;
+                // ASR::asr_t* duplicate_ArrayItem(ArrayItem_t* x)
+
                 for (size_t i = 0; i < els.size(); ++i) {
                     if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
                         auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
@@ -530,6 +533,30 @@ public:
                     }
                 }
 
+                ASR::ttype_t *t = LFortran::ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc,
+                                                            4, nullptr, 0));
+
+                // expr_t* a_v, array_index_t* a_args, size_t n_args, ttype_t* a_type, expr_t* a_value
+                ASR::expr_t *idx_var = ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc, 1,
+                                        t));
+                ASR::array_index_t ai;
+                ai.loc = x.base.base.loc;
+                ai.m_left = ai.m_right = nullptr;
+                ai.m_right = idx_var;
+                Vec<ASR::array_index_t> argsi; argsi.reserve(al, 1);
+                argsi.push_back(al, ai);
+
+                ASR::ttype_t* array_ref_type = ASRUtils::expr_type(ASRUtils::EXPR((ASR::asr_t*)arr_var));
+                Vec<ASR::dimension_t> empty_dims;
+                empty_dims.reserve(al, 1);
+                array_ref_type = ASRUtils::duplicate_type(al, array_ref_type, &empty_dims);
+
+                
+                auto var_var = ASRUtils::EXPR(ASR::make_Var_t(al, x.base.base.loc, arr_symbol));
+                tmp = ASR::make_ArrayItem_t(al, x.base.base.loc, var_var, argsi.p, 1, array_ref_type, nullptr);
+
+
+                return;
                 // TODO
                 // ASR::make_Array
 
@@ -565,10 +592,12 @@ public:
                 //     }
                 // }
                 
+
+
                 // arr->m_func holds the array to assign to              
-                std::string array = to_lower(arr->m_func);
-                auto sym = current_scope->resolve_symbol(array);
-                if (sym == nullptr /*&& !compiler_options.implicit_typing*/) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
+                // std::string array = to_lower(arr->m_func);
+                // auto sym = current_scope->resolve_symbol(array);
+                // if (sym == nullptr /*&& !compiler_options.implicit_typing*/) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
             } else {
                 throw SemanticError("Implied loop in data statement currently only supported for arrays.", x.base.base.loc);
             }
@@ -584,7 +613,7 @@ public:
 
         auto sym = current_scope->resolve_symbol(loop_var_name);
         // TODO: change to ==
-        if (sym != nullptr) throw SemanticError("Data Statement variable not declared.", x.base.base.loc);
+        if (sym == nullptr) throw SemanticError("Data Statement variable not declared.", x.base.base.loc);
     }
 
     void visit_Inquire(const AST::Inquire_t& x) {
