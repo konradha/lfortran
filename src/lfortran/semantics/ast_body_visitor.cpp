@@ -475,6 +475,18 @@ public:
             auto obj = x.m_object_list[i];
             if (AST::is_a<AST::FuncCallOrArray_t>(*obj)) {
                 auto arr = AST::down_cast<AST::FuncCallOrArray_t>(obj);
+                auto arr_symbol = current_scope->resolve_symbol(to_lower(arr->m_func));
+                ASR::Variable_t *arr_var = nullptr;
+                if (ASR::is_a<ASR::Variable_t>(*arr_symbol)) {
+                    arr_var = ASR::down_cast<ASR::Variable_t>(arr_symbol);
+                    std::cout << "found variable " << arr_var->m_name << "\n";
+                } else {
+                    throw SemanticError("Data variable not declared.", x.base.base.loc);
+                }
+
+                ASR::ttype_t *duplicated_type = ASRUtils::duplicate_type(al, arr_var->m_type);
+
+
                 func_calls[arr] = {};
                 Vec<ASR::call_arg_t> args;
                 visit_expr_list(arr->m_args, arr->n_args, args);
@@ -499,8 +511,7 @@ public:
                 size_t iter = 1;
                 if (incr != nullptr) iter = incr->m_n;
                 auto els = func_calls[arr];
-                std::cout << "start = " << start->m_n << ", end = " << end->m_n << "\n";
-                std::vector<bool> marks(els.size(), false);
+                std::cout << "start = " << start->m_n << ", end = " << end->m_n << ", iter = " << iter << "\n";
 
                 for (size_t i = 0; i < els.size(); ++i) {
                     if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
@@ -515,26 +526,28 @@ public:
                         // in this case: 125 entries to fill in
                         auto el = ASR::down_cast<ASR::Var_t>(els[i]);
                         auto var = ASR::down_cast<ASR::Variable_t>(el->m_v);
-                        marks[i] = true;
                         // std::cout << i << ": " << var->m_name << "\n";
                     }
                 }
 
-                std::vector<size_t> range{};
-                for (size_t i = start->m_n; i <= size_t(end->m_n); i += iter) range.push_back(i);
-                auto print = [&](std::vector<size_t> &c) {
-                    std::cout << "{"; for (const auto &el : c) std::cout << el << ",";
-                    std::cout << "} x ";
-                };
+                // TODO
+                // ASR::make_Array
 
-                for (size_t i = 0; i < els.size(); ++i) {
-                    if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
-                        auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
-                        std::cout << "{" << el->m_n << "} x ";
-                    } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
-                        print(range);
-                    }
-                }
+                // std::vector<size_t> range{};
+                // for (size_t i = start->m_n; i <= size_t(end->m_n); i += iter) range.push_back(i);
+                // auto print = [&](std::vector<size_t> &c) {
+                //     std::cout << "{"; for (const auto &el : c) std::cout << el << ",";
+                //     std::cout << "} x ";
+                // };
+
+                // for (size_t i = 0; i < els.size(); ++i) {
+                //     if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                //         auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                //         std::cout << "{" << el->m_n << "} x ";
+                //     } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                //         print(range);
+                //     }
+                // }
 
 
 
@@ -555,7 +568,7 @@ public:
                 // arr->m_func holds the array to assign to              
                 std::string array = to_lower(arr->m_func);
                 auto sym = current_scope->resolve_symbol(array);
-                if (sym == nullptr) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
+                if (sym == nullptr /*&& !compiler_options.implicit_typing*/) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
             } else {
                 throw SemanticError("Implied loop in data statement currently only supported for arrays.", x.base.base.loc);
             }

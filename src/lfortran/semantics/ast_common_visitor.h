@@ -862,14 +862,25 @@ public:
         //   data x / 1.0, 2.0 /, a, b / 1.0, 2.0 /, c / 1.0 /
         for (size_t i=0; i < x.n_items; i++) {
             AST::DataStmtSet_t *a = AST::down_cast<AST::DataStmtSet_t>(x.m_items[i]);
+            bool has_implied_do = false;
+            // introduce preprocessing step
+            if (AST::is_a<AST::DataImpliedDo_t>(*a->m_object[0])) {
+                std::cout << "has implied do\n";
+                has_implied_do = true;
+            }
+
+
             // Now we are dealing with just one item, there are three cases possible:
             // data x / 1, 2, 3 /       ! x must be an array
             // data x / 1 /             ! x must be a scalar (integer)
             // data x, y, z / 1, 2, 3 / ! x, y, z must be a scalar (integer)
-            if (a->n_object != a->n_value) {
+            if (a->n_object != a->n_value && !has_implied_do) {
                 // This is the first case:
                 // data x / 1, 2, 3 /       ! x must be an array
                 if (a->n_object == 1) {
+                    std::cout << "in " << __LINE__ << "\n";
+                    // this is the point at which visit_DataImpliedDo is called
+                    //  -> the object will need to yield an expression
                     this->visit_expr(*a->m_object[0]);
                     ASR::expr_t* object = ASRUtils::EXPR(tmp);
                     ASR::ttype_t* obj_type = ASRUtils::expr_type(object);
@@ -920,10 +931,10 @@ public:
                         x.base.base.loc);
                 }
             } else {
+                std::cout << "in " << __LINE__ << "\n";
                 // This is the second and third case:
                 // data x / 1 /             ! x must be a scalar (integer)
                 // data x, y, z / 1, 2, 3 / ! x, y, z must be a scalar (integer)
-
                 // Note: this also happens for a case like:
                 // data x(1), x(2), x(3) / 1, 2, 3 /
                 for (size_t i=0;i<a->n_object;++i) {
