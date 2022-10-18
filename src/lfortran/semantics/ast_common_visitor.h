@@ -1092,6 +1092,13 @@ public:
                                     // TODO
                                     throw SemanticError("Attribute declaration not "
                                         "supported yet", x.base.base.loc);
+                                } else if (sa->m_attr == AST::simple_attributeType
+                                        ::AttrCommon) {
+                                    diag.semantic_warning_label(
+                                        "Common statement is not implemented yet, for now we will ignore it",
+                                        {x.base.base.loc},
+                                        "ignored for now"
+                                    );
                                 } else {
                                     throw SemanticError("Attribute declaration not "
                                             "supported", x.base.base.loc);
