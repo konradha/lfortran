@@ -19,6 +19,7 @@
       !DATA (coef(i,1),i=1,5)/2*0.0D0, 1*1.0D0, 2*2.0D0/
       !DATA (coef(i,1),i=1,5)/0.0D0, 0.0D0, 1.0D0, 2.0D0, 2.0D0/
       DATA (coef(i,1),i=1,1)/0.0D0/
+      coef2(1,1,1) = 1.0d00
 
       do i=1,5
         print *, coef(i, 1)

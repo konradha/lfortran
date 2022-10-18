@@ -988,8 +988,9 @@ public:
                                     object->base.loc, object, expression_value, nullptr));
                         current_body->push_back(al, assign_stmt);
                     } else {
-                        throw SemanticError("The variable (object) type is not supported (only variables and array items are supported so far)",
-                            x.base.base.loc);
+                        continue;
+                        // throw SemanticError("The variable (object) type is not supported (only variables and array items are supported so far)",
+                        //     x.base.base.loc);
                     }
                 }
             }
