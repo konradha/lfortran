@@ -2754,6 +2754,22 @@ public:
     void visit_FuncCallOrArray(const AST::FuncCallOrArray_t &x) {
         SymbolTable *scope = current_scope;
         std::string var_name = to_lower(x.m_func);
+        auto sym = current_scope->resolve_symbol(var_name);
+        if (sym != nullptr) {
+            // some cases -> sym is a:
+            // 1) variable but its name is an intrinsic function -> what do? (guess: rely on flags passed
+            //    when compiling, ie. allow using an intrinsic's name as variable or as a diff function)
+            // 2) variable and the dimensions work for an array (do nothing, proceed as we know it -> array)
+            // 3) external function and we need to remove the variable declaration out of scope
+            //    and instead create a variable symbol table depending on the symbols present in the
+            //    function call
+            // 4) sym is a procedure (do nothing, proceed as we know it -> function)
+
+
+            throw SemanticError("blub", x.base.base.loc);
+        }
+
+
         ASR::symbol_t *v = nullptr;
         ASR::expr_t *v_expr = nullptr;
         // If this is a type bound procedure (in a class) it won't be in the
