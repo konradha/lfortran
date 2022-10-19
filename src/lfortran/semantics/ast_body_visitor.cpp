@@ -97,6 +97,7 @@ public:
                         body.push_back(al, impl_decl);
                     }
                 }
+
                 body.push_back(al, tmp_stmt);
             }
             // To avoid last statement to be entered twice once we exit this node
@@ -467,6 +468,17 @@ public:
             incr = AST::down_cast<AST::Num_t>(x.m_increment);
         }
 
+
+        ASR::expr_t *s, *e, *step;
+        visit_expr(*x.m_start); s = ASRUtils::EXPR(tmp);
+        visit_expr(*x.m_end); e = ASRUtils::EXPR(tmp);
+        if (x.m_increment != nullptr) {
+            visit_expr(*x.m_increment);
+            step = ASRUtils::EXPR(tmp);
+        } else {
+            step = nullptr;
+        }
+
         // std::array<{AST::FuncCallOrArray_t, std::array<std::variant<ASR::IntegerConstant, ASR::Variable_t>> of size (args.n-1)}>
 
         std::map<AST::FuncCallOrArray_t *, std::vector<ASR::expr_t *> > func_calls;
@@ -512,6 +524,9 @@ public:
                 if (incr != nullptr) iter = incr->m_n;
                 auto els = func_calls[arr];
                 std::cout << "start = " << start->m_n << ", end = " << end->m_n << ", iter = " << iter << "\n";
+                size_t r = (end->m_n - start->m_n) % iter;
+                size_t steps = (end->m_n - start->m_n) / iter;
+                if (r) steps += r;
 
                 // Vec<array_index_t> v_args;
                 // ASR::asr_t* duplicate_ArrayItem(ArrayItem_t* x)
@@ -532,6 +547,24 @@ public:
                         // std::cout << i << ": " << var->m_name << "\n";
                     }
                 }
+
+                // make_ArrayItem_t(Allocator &al, const Location &a_loc, expr_t* a_v, array_index_t* a_args, size_t n_args, ttype_t* a_type, expr_t* a_value)
+
+                Vec<ASR::array_index_t> arr_args;
+                arr_args.reserve(al, 1);
+                auto var_exp = ASRUtils::EXPR(ASR::make_Var_t(al, x.base.base.loc, arr_symbol));
+                ASR::array_index_t ai;
+                ai.loc = x.base.base.loc;
+                ai.m_left = s;
+                ai.m_right = e;
+                ai.m_step = step;
+                arr_args.push_back(al, ai);
+
+                Vec<ASR::dimension_t> empty_dims;
+                empty_dims.reserve(al, 1);
+                duplicated_type = ASRUtils::duplicate_type(al, duplicated_type, &empty_dims);
+
+                tmp = ASR::make_ArrayItem_t(al, x.base.base.loc, var_exp, arr_args.p, arr_args.n, duplicated_type, nullptr);
 
                 // ASR::ttype_t *t = LFortran::ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc,
                 //                                             4, nullptr, 0));
@@ -554,25 +587,7 @@ public:
                 // auto var_var = ASRUtils::EXPR(ASR::make_Var_t(al, x.base.base.loc, arr_symbol));
 
 
-                Vec<ASR::dimension_t> dims;
-                dims.reserve(al, 1);
-                ASR::dimension_t dim;
-                dim.loc = x.base.base.loc;
-                ASR::ttype_t *int32_type = ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc,
-                                                                                        4, nullptr, 0));
-                ASR::expr_t* one = ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc, 1, int32_type));
-                ASR::expr_t* x_n_args = ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc,
-                                        1, int32_type));
-                Vec<ASR::expr_t*> body;
-                body.reserve(al, 1);
-                dim.m_start = one;
-                dim.m_length = x_n_args;
-                dims.push_back(al, dim);
-                duplicated_type = ASRUtils::duplicate_type(al, duplicated_type, &dims);
-                tmp = ASR::make_ArrayConstant_t(al, x.base.base.loc, body.p,
-                            body.n, duplicated_type);
-
-                return;
+                
                 // TODO
                 // ASR::make_Array
 
@@ -614,7 +629,9 @@ public:
                 // std::string array = to_lower(arr->m_func);
                 // auto sym = current_scope->resolve_symbol(array);
                 // if (sym == nullptr /*&& !compiler_options.implicit_typing*/) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
+            
             } else  if (AST::is_a<AST::DataImpliedDo_t>(*obj)) {
+                // TODO this case needs to be solved!
                 throw SemanticError("Data implied do can be nested, apparently.", x.base.base.loc);
             } else {
                 std::cout << "type is " << obj->type << "\n";

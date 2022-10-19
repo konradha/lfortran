@@ -1,5 +1,6 @@
       subroutine dt1()
       double precision coef(5,4)
+      double precision cpy_coef(5,4)
 
       double precision coef2(5, 4, 4)
 
@@ -18,12 +19,24 @@
       integer i
       !DATA (coef(i,1),i=1,5)/2*0.0D0, 1*1.0D0, 2*2.0D0/
       !DATA (coef(i,1),i=1,5)/0.0D0, 0.0D0, 1.0D0, 2.0D0, 2.0D0/
-      DATA (coef(i,1),i=1,1)/0.0D0/
-      coef2(1,1,1) = 1.0d00
 
-      do i=1,5
-        print *, coef(i, 1)
-      end do
+
+
+      ! EXAMPLE THAT NEEDS TO WORK
+      !DATA (coef(i,1),i=1,4,2)/0.0D0/
+
+      ! workaround with current bug
+      DATA (coef(i,1),i=1,4,2)/0.0D0, 1.0D0/
+      
+      ! sanity check line
+      !DATA cpy_coef(1,1), coef(2,1), coef(4,1)/0.0D0, 0.0D0, 1.0D0/
+
+      ! same thing, different dimensions
+      !DATA coef2(1,1,1) / 1.0d00 /
+
+      !do i=1,5
+      !  print *, coef(i, 1)
+      !end do
       END
 
 
