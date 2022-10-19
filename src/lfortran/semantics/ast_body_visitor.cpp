@@ -6,6 +6,7 @@
 #include <string>
 #include <cmath>
 #include <set>
+#include <variant>
 
 #include <lfortran/ast.h>
 #include <libasr/asr.h>
@@ -96,6 +97,7 @@ public:
                         body.push_back(al, impl_decl);
                     }
                 }
+
                 body.push_back(al, tmp_stmt);
             }
             // To avoid last statement to be entered twice once we exit this node
@@ -453,6 +455,201 @@ public:
             pass_instantiate_generic_function(al, subs, rt_subs, current_scope,
                 use_symbol->m_local_rename, ASR::down_cast<ASR::Function_t>(s));
         }
+    }
+
+    void visit_DataImpliedDo(const AST::DataImpliedDo_t &x) {
+        std::string loop_var_name = to_lower(x.m_var);
+        // auto sym = current_scope->resolve_symbol(array);
+        // if (sym != nullptr) throw SemanticError("Data statement loop variable cannot be have same name as other variable.", x.base.base.loc);
+        auto start = AST::down_cast<AST::Num_t>(x.m_start);
+        auto end = AST::down_cast<AST::Num_t>(x.m_end);
+        AST::Num_t *incr = nullptr;
+        if (x.m_increment != nullptr && AST::is_a<AST::Num_t>(*x.m_increment)) {
+            incr = AST::down_cast<AST::Num_t>(x.m_increment);
+        }
+
+
+        ASR::expr_t *s, *e, *step;
+        visit_expr(*x.m_start); s = ASRUtils::EXPR(tmp);
+        visit_expr(*x.m_end); e = ASRUtils::EXPR(tmp);
+        if (x.m_increment != nullptr) {
+            visit_expr(*x.m_increment);
+            step = ASRUtils::EXPR(tmp);
+        } else {
+            step = nullptr;
+        }
+
+        // std::array<{AST::FuncCallOrArray_t, std::array<std::variant<ASR::IntegerConstant, ASR::Variable_t>> of size (args.n-1)}>
+
+        std::map<AST::FuncCallOrArray_t *, std::vector<ASR::expr_t *> > func_calls;
+
+        for (size_t i = 0; i < x.n_object_list; ++i) {
+            auto obj = x.m_object_list[i];
+            if (AST::is_a<AST::FuncCallOrArray_t>(*obj)) {
+                auto arr = AST::down_cast<AST::FuncCallOrArray_t>(obj);
+                auto arr_symbol = current_scope->resolve_symbol(to_lower(arr->m_func));
+                ASR::Variable_t *arr_var = nullptr;
+                if (ASR::is_a<ASR::Variable_t>(*arr_symbol)) {
+                    arr_var = ASR::down_cast<ASR::Variable_t>(arr_symbol);
+                    std::cout << "found variable " << arr_var->m_name << "\n";
+                } else {
+                    throw SemanticError("Data variable not declared.", x.base.base.loc);
+                }
+
+                ASR::ttype_t *duplicated_type = ASRUtils::duplicate_type(al, arr_var->m_type);
+
+
+                func_calls[arr] = {};
+                Vec<ASR::call_arg_t> args;
+                visit_expr_list(arr->m_args, arr->n_args, args);
+                for (size_t i = 0; i< args.n; ++i) {
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*(args[i].m_value))) {
+                        auto num = ASR::down_cast<ASR::IntegerConstant_t>(args[i].m_value);
+                        func_calls[arr].push_back((ASR::expr_t*)num);
+
+                    } else if (ASR::is_a<ASR::Var_t>(*(args[i].m_value))) {
+                        auto var = ASR::down_cast<ASR::Var_t>(args[i].m_value);
+                        func_calls[arr].push_back((ASR::expr_t*)var);
+                        if (ASR::is_a<ASR::Variable_t>(*var->m_v)) {
+                            auto variable = ASR::down_cast<ASR::Variable_t>(var->m_v);
+                            if (loop_var_name != variable->m_name) throw SemanticError("Need to have consistent loop variable in data statement", x.base.base.loc);
+                        }
+                    } else {
+                        throw SemanticError("Can only assign to variables and integers in data statement", x.base.base.loc);
+                    }
+                } // coeff(i, i, 1) <- collect (`i`, 0); (`i`, 1) and (`1`, 2) [the symbol + the index to fill in]
+
+                // collected all indices, can now fill in  
+                size_t iter = 1;
+                if (incr != nullptr) iter = incr->m_n;
+                auto els = func_calls[arr];
+                std::cout << "start = " << start->m_n << ", end = " << end->m_n << ", iter = " << iter << "\n";
+                size_t r = (end->m_n - start->m_n) % iter;
+                size_t steps = (end->m_n - start->m_n) / iter;
+                if (r) steps += r;
+
+                // Vec<array_index_t> v_args;
+                // ASR::asr_t* duplicate_ArrayItem(ArrayItem_t* x)
+
+                for (size_t i = 0; i < els.size(); ++i) {
+                    if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                        auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                        // std::cout << i << ": " << el->m_n << "\n";
+                    } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                        // everytime this one is encountered, the number of
+                        // combinations is multiplied by num_steps (ie. start=1, end=5, iter=1 -> num_steps=5)
+                        // and we have another range of possibilities we have to enter
+                        // arr(i, i, i, 1) with start=1 end=50 iter=10 has
+                        // arr(1, 1, 1, 1) ... arr(1, 11, 11, 1) ... arr(22, 33, 44, 1) etc
+                        // in this case: 125 entries to fill in
+                        auto el = ASR::down_cast<ASR::Var_t>(els[i]);
+                        auto var = ASR::down_cast<ASR::Variable_t>(el->m_v);
+                        // std::cout << i << ": " << var->m_name << "\n";
+                    }
+                }
+
+                // make_ArrayItem_t(Allocator &al, const Location &a_loc, expr_t* a_v, array_index_t* a_args, size_t n_args, ttype_t* a_type, expr_t* a_value)
+
+                Vec<ASR::array_index_t> arr_args;
+                arr_args.reserve(al, 1);
+                auto var_exp = ASRUtils::EXPR(ASR::make_Var_t(al, x.base.base.loc, arr_symbol));
+                ASR::array_index_t ai;
+                ai.loc = x.base.base.loc;
+                ai.m_left = s;
+                ai.m_right = e;
+                ai.m_step = step;
+                arr_args.push_back(al, ai);
+
+                Vec<ASR::dimension_t> empty_dims;
+                empty_dims.reserve(al, 1);
+                duplicated_type = ASRUtils::duplicate_type(al, duplicated_type, &empty_dims);
+
+                tmp = ASR::make_ArrayItem_t(al, x.base.base.loc, var_exp, arr_args.p, arr_args.n, duplicated_type, nullptr);
+
+                // ASR::ttype_t *t = LFortran::ASRUtils::TYPE(ASR::make_Integer_t(al, x.base.base.loc,
+                //                                             4, nullptr, 0));
+
+                // // expr_t* a_v, array_index_t* a_args, size_t n_args, ttype_t* a_type, expr_t* a_value
+                // ASR::expr_t *idx_var = ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, x.base.base.loc, 1,
+                //                         t));
+                // ASR::array_index_t ai;
+                // ai.loc = x.base.base.loc;
+                // ai.m_left = ai.m_right = nullptr;
+                // ai.m_right = idx_var;
+                // Vec<ASR::array_index_t> argsi; argsi.reserve(al, 1);
+                // argsi.push_back(al, ai);
+
+                // ASR::ttype_t* array_ref_type = ASRUtils::expr_type(ASRUtils::EXPR((ASR::asr_t*)arr_var));
+                // Vec<ASR::dimension_t> empty_dims;
+                // empty_dims.reserve(al, 1);
+                // array_ref_type = ASRUtils::duplicate_type(al, array_ref_type, &empty_dims);
+
+                // auto var_var = ASRUtils::EXPR(ASR::make_Var_t(al, x.base.base.loc, arr_symbol));
+
+
+                
+                // TODO
+                // ASR::make_Array
+
+                // std::vector<size_t> range{};
+                // for (size_t i = start->m_n; i <= size_t(end->m_n); i += iter) range.push_back(i);
+                // auto print = [&](std::vector<size_t> &c) {
+                //     std::cout << "{"; for (const auto &el : c) std::cout << el << ",";
+                //     std::cout << "} x ";
+                // };
+
+                // for (size_t i = 0; i < els.size(); ++i) {
+                //     if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                //         auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                //         std::cout << "{" << el->m_n << "} x ";
+                //     } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                //         print(range);
+                //     }
+                // }
+
+
+
+
+                // for (size_t i = start->m_n; i <= size_t(end->m_n); i += iter) {
+                //     if (ASR::is_a<ASR::IntegerConstant_t>(*els[i])) {
+                //         auto el = ASR::down_cast<ASR::IntegerConstant_t>(els[i]);
+                //         std::cout << i << ": " << el->m_n << "\n";
+                //     } else if (ASR::is_a<ASR::Var_t>(*els[i])) {
+                //         auto el = ASR::down_cast<ASR::Var_t>(els[i]);
+                //         auto var = ASR::down_cast<ASR::Variable_t>(el->m_v);
+                //         std::cout << i << ": " << var->m_name << "\n";
+                //     } else {
+                //         std::cout << "we have a problem\n";
+                //     }
+                // }
+                
+
+
+                // arr->m_func holds the array to assign to              
+                // std::string array = to_lower(arr->m_func);
+                // auto sym = current_scope->resolve_symbol(array);
+                // if (sym == nullptr /*&& !compiler_options.implicit_typing*/) throw SemanticError("Data Statement Variable not declared.", x.base.base.loc);
+            
+            } else  if (AST::is_a<AST::DataImpliedDo_t>(*obj)) {
+                // TODO this case needs to be solved!
+                throw SemanticError("Data implied do can be nested, apparently.", x.base.base.loc);
+            } else {
+                std::cout << "type is " << obj->type << "\n";
+                throw SemanticError("Implied loop in data statement currently only supported for arrays.", x.base.base.loc);
+            }
+        }
+
+        // size_t iter = 1;
+        // if (incr != nullptr) iter = incr->m_n;
+        // for (size_t i = start->m_n; i <= end->m_n; i += iter) {
+        //     std::cout << "iter " << i << " of " << end->m_n << "\n";
+        // }
+
+
+
+        auto sym = current_scope->resolve_symbol(loop_var_name);
+        // TODO: change to ==
+        if (sym == nullptr) throw SemanticError("Data Statement variable not declared.", x.base.base.loc);
     }
 
     void visit_Inquire(const AST::Inquire_t& x) {

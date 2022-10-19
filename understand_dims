@@ -1,0 +1,105 @@
+(Real 8
+    [
+      (
+        (
+          IntegerConstant 1 (Integer 4 [])
+        ) 
+        
+        (
+          IntegerConstant 5 (Integer 4 [])
+        )
+      )
+
+      (
+        (
+          IntegerConstant 1 (Integer 4 [])
+        ) 
+        (
+          IntegerConstant 4 (Integer 4 [])
+        )
+      )
+    ]
+) 
+
+
+and the actual dimension declaration is
+
+
+double precision coef(5,4)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA cpy_coef(1,1), coef(2,1), coef(4,1)/0.0D0, 0.0D0, 0.0D0/
+
+gets represented as
+
+
+  [(=
+        (ArrayItem
+            (Var 2 cpy_coef)
+            [(()
+            (IntegerConstant 1 (Integer 4 []))
+            ())
+            (()
+            (IntegerConstant 1 (Integer 4 []))
+            ())]
+            (Real 8 [])
+            ()
+        )
+        (RealConstant
+            0.000000
+            (Real 8 [])
+        )
+        ()
+    )
+    (=
+        (ArrayItem
+            (Var 2 coef)
+            [(()
+            (IntegerConstant 2 (Integer 4 []))
+            ())
+            (()
+            (IntegerConstant 1 (Integer 4 []))
+            ())]
+            (Real 8 [])
+            ()
+        )
+        (RealConstant
+            0.000000
+            (Real 8 [])
+        )
+        ()
+    )
+    (=
+        (ArrayItem
+            (Var 2 coef)
+            [(()
+            (IntegerConstant 4 (Integer 4 []))
+            ())
+            (()
+            (IntegerConstant 1 (Integer 4 []))
+            ())]
+            (Real 8 [])
+            ()
+        )
+        (RealConstant
+            0.000000
+            (Real 8 [])
+        )
+        ()
+    )]
