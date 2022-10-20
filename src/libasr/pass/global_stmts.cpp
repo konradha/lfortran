@@ -18,7 +18,8 @@ using LFortran::ASRUtils::EXPR;
  *
  */
 void pass_wrap_global_stmts_into_function(Allocator &al,
-            ASR::TranslationUnit_t &unit, const std::string &fn_name_s) {
+            ASR::TranslationUnit_t &unit, const LCompilers::PassOptions& pass_options) {
+    std::string fn_name_s = pass_options.run_fun;
     if (unit.n_items > 0) {
         // Add an anonymous function
         Str s;
@@ -112,15 +113,16 @@ void pass_wrap_global_stmts_into_function(Allocator &al,
                 /* a_name */ fn_name,
                 /* a_args */ nullptr,
                 /* n_args */ 0,
-                /* a_type_params */ nullptr,
-                /* n_type_params*/ 0,
                 /* a_body */ body.p,
                 /* n_body */ body.size(),
                 /* a_return_var */ return_var_ref,
                 ASR::abiType::BindC,
                 ASR::Public, ASR::Implementation,
                 nullptr,
-                false, false, false);
+                false, false, false, false, false,
+                nullptr, 0,
+                nullptr, 0,
+                false);
             std::string sym_name = fn_name;
             if (unit.m_global_scope->get_symbol(sym_name) != nullptr) {
                 throw LCompilersException("Function already defined");
@@ -135,13 +137,15 @@ void pass_wrap_global_stmts_into_function(Allocator &al,
                 /* a_name */ fn_name,
                 /* a_args */ nullptr,
                 /* n_args */ 0,
-                nullptr, 0,
                 /* a_body */ body.p,
                 /* n_body */ body.size(),
                 nullptr,
                 ASR::abiType::Source,
                 ASR::Public, ASR::Implementation, nullptr,
-                false, false, false);
+                false, false, false, false, false,
+                nullptr, 0,
+                nullptr, 0,
+                false);
             std::string sym_name = fn_name;
             if (unit.m_global_scope->get_symbol(sym_name) != nullptr) {
                 throw LCompilersException("Function already defined");
@@ -150,7 +154,6 @@ void pass_wrap_global_stmts_into_function(Allocator &al,
         }
         unit.m_items = nullptr;
         unit.n_items = 0;
-        LFORTRAN_ASSERT(asr_verify(unit));
     }
 }
 

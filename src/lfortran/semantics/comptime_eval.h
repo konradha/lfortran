@@ -25,7 +25,7 @@ struct IntrinsicProceduresAsASRNodes {
         IntrinsicProceduresAsASRNodes() {
             intrinsics_present_in_ASR = {"size", "lbound", "ubound",
                 "transpose", "matmul", "pack", "transfer", "cmplx",
-                "reshape"};
+                "dcmplx", "reshape", "ichar"};
         }
 
         bool is_intrinsic_present_in_ASR(std::string& name) {
@@ -76,6 +76,8 @@ struct IntrinsicProcedures {
 
             // Require evaluated arguments
             {"aimag", {m_math, &eval_aimag, true}},
+            {"imag", {m_math, &eval_aimag, true}},
+            {"dimag", {m_math, &eval_aimag, true}},
             {"char", {m_builtin, &eval_char, true}},
             {"floor", {m_math3, &eval_floor, true}},
             {"ceiling", {m_math2, &eval_ceiling, true}},
@@ -84,18 +86,36 @@ struct IntrinsicProcedures {
             {"modulo", {m_math2, &eval_modulo, true}},
             {"min", {m_math2, &eval_min, true}},
             {"max", {m_math2, &eval_max, true}},
+            {"min0", {m_math2, &eval_min0, true}},
+            {"dmin1", {m_math2, &eval_dmin1, true}},
+            {"max0", {m_math2, &eval_max0, true}},
+            {"dmax1", {m_math2, &eval_dmax1, true}},
             {"merge", {m_math2, &not_implemented, false}},
             {"selected_int_kind", {m_kind, &eval_selected_int_kind, true}},
             {"selected_real_kind", {m_kind, &eval_selected_real_kind, true}},
             {"selected_char_kind", {m_kind, &eval_selected_char_kind, true}},
             {"exp", {m_math, &eval_exp, true}},
+            {"dexp", {m_math, &eval_dexp, true}},
+            {"sexp", {m_math, &eval_sexp, true}},
+            {"cexp", {m_math, &eval_cexp, true}},
+            {"zexp", {m_math, &eval_zexp, true}},
             {"range", {m_math, &eval_range, false}},
             {"epsilon", {m_math, &eval_epsilon, false}},
             {"log", {m_math, &eval_log, true}},
+            {"alog", {m_math, &eval_alog, true}},
+            {"slog", {m_math, &eval_slog, true}},
+            {"dlog", {m_math, &eval_dlog, true}},
+            {"clog", {m_math, &eval_clog, true}},
+            {"zlog", {m_math, &eval_zlog, true}},
             {"erf", {m_math, &eval_erf, true}},
             {"erfc", {m_math, &eval_erfc, true}},
             {"abs", {m_math, &eval_abs, true}},
             {"sqrt", {m_math, &eval_sqrt, true}},
+            {"dsqrt", {m_math, &eval_dsqrt, true}},
+            {"datan", {m_math, &eval_datan, true}},
+            {"dabs", {m_math2, &eval_dabs, true}},
+            {"dcos", {m_math, &eval_dcos, true}},
+            {"dsin", {m_math, &eval_dsin, true}},
             {"gamma", {m_math, &eval_gamma, true}},
             {"log_gamma", {m_math, &eval_log_gamma, true}},
             {"log10", {m_math, &eval_log10, true}},
@@ -477,8 +497,14 @@ struct IntrinsicProcedures {
 #define TRIG_CB2(X) static ASR::expr_t *eval_##X(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) { \
         return eval_trig(al, loc, args, &X, &lfortran_z##X); \
     }
+#define TRIG2_CB(X, Y) static std::complex<double> lfortran_z##Y(std::complex<double> x) { return std::X(x); }
+#define TRIG2_CB2(X, Y) static ASR::expr_t *eval_##Y(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) { \
+        return eval_trig(al, loc, args, &X, &lfortran_z##Y); \
+    }
 #define TRIG(X) TRIG_CB(X) \
     TRIG_CB2(X)
+#define TRIG2(X, Y) TRIG2_CB(X, Y) \
+    TRIG2_CB2(X, Y)
 
 TRIG(sin)
 TRIG(cos)
@@ -496,6 +522,23 @@ TRIG(atanh)
 TRIG(exp)
 TRIG(log)
 TRIG(sqrt)
+
+TRIG2(exp, dexp)
+TRIG2(exp, sexp)
+TRIG2(exp, cexp)
+TRIG2(exp, zexp)
+
+TRIG2(log, alog)
+TRIG2(log, dlog)
+TRIG2(log, slog)
+TRIG2(log, clog)
+TRIG2(log, zlog)
+
+TRIG2(sin, dsin)
+TRIG2(cos, dcos)
+TRIG2(atan, datan)
+TRIG2(sqrt, dsqrt)
+
 
     static ASR::expr_t *eval_erf(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) {
         return eval_trig(al, loc, args, &erf, nullptr);
@@ -585,6 +628,20 @@ TRIG(sqrt)
         true);
     }
 
+    static ASR::expr_t *eval_dmin1(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) {
+        return eval_2args_ri(al, loc, args,
+            &IntrinsicProcedures::lfortran_min,
+            &IntrinsicProcedures::lfortran_min_i,
+        true);
+    }
+
+    static ASR::expr_t *eval_min0(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) {
+        return eval_2args_ri(al, loc, args,
+            &IntrinsicProcedures::lfortran_min,
+            &IntrinsicProcedures::lfortran_min_i,
+        true);
+    }
+
     static double lfortran_max(double x, double y) {
         return std::fmax(x, y);
     }
@@ -594,6 +651,20 @@ TRIG(sqrt)
     }
 
     static ASR::expr_t *eval_max(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) {
+        return eval_2args_ri(al, loc, args,
+            &IntrinsicProcedures::lfortran_max,
+            &IntrinsicProcedures::lfortran_max_i,
+            true);
+    }
+
+    static ASR::expr_t *eval_dmax1(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) {
+        return eval_2args_ri(al, loc, args,
+            &IntrinsicProcedures::lfortran_max,
+            &IntrinsicProcedures::lfortran_max_i,
+            true);
+    }
+
+    static ASR::expr_t *eval_max0(Allocator &al, const Location &loc, Vec<ASR::expr_t*> &args) {
         return eval_2args_ri(al, loc, args,
             &IntrinsicProcedures::lfortran_max,
             &IntrinsicProcedures::lfortran_max_i,
@@ -625,6 +696,24 @@ TRIG(sqrt)
             return ASR::down_cast<ASR::expr_t>(ASR::make_RealConstant_t(al, loc, result, t));
         } else {
             throw SemanticError("Argument of the abs function must be Integer, Real or Complex", loc);
+        }
+    }
+
+    static ASR::expr_t *eval_dabs(Allocator &al, const Location &loc,
+            Vec<ASR::expr_t*> &args
+            ) {
+        LFORTRAN_ASSERT(ASRUtils::all_args_evaluated(args));
+        if (args.size() != 1) {
+            throw SemanticError("Intrinsic abs function accepts exactly 1 argument", loc);
+        }
+        ASR::expr_t* trig_arg = args[0];
+        ASR::ttype_t* t = LFortran::ASRUtils::expr_type(args[0]);
+        if (LFortran::ASR::is_a<LFortran::ASR::Real_t>(*t)) {
+            double rv = ASR::down_cast<ASR::RealConstant_t>(trig_arg)->m_r;
+            double val = std::abs(rv);
+            return ASR::down_cast<ASR::expr_t>(ASR::make_RealConstant_t(al, loc, val, t));
+        } else {
+            throw SemanticError("Argument of the dabs function must be Real", loc);
         }
     }
 
@@ -1012,16 +1101,19 @@ TRIG(sqrt)
         }
         if (ASR::is_a<LFortran::ASR::Integer_t>(*huge_type)) {
             int kind = LFortran::ASRUtils::extract_kind_from_ttype_t(huge_type);
-            if(kind == 4) {
-                int max_val = std::numeric_limits<int>::max();
+            if (kind == 4) {
+                int32_t max_val = std::numeric_limits<int>::max();
+                return ASR::down_cast<ASR::expr_t>(ASR::make_IntegerConstant_t(al, loc, max_val, huge_type));
+            } else if (kind == 8) {
+                int64_t max_val = std::numeric_limits<int64_t>::max();
                 return ASR::down_cast<ASR::expr_t>(ASR::make_IntegerConstant_t(al, loc, max_val, huge_type));
             } else {
-                throw SemanticError("Only int32 kind is supported", loc);
+                throw SemanticError("Only int32, int64 kind is supported", loc);
             }
         } else if (ASR::is_a<LFortran::ASR::Real_t>(*huge_type)) {
             // TODO: Figure out how to deal with higher precision later
             int kind = LFortran::ASRUtils::extract_kind_from_ttype_t(huge_type);
-            if (kind == 4){
+            if (kind == 4) {
                 float max_val = std::numeric_limits<float>::max();
                 return ASR::down_cast<ASR::expr_t>(
                     ASR::make_RealConstant_t(al, loc, max_val, huge_type)

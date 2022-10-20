@@ -8,9 +8,6 @@
 namespace LFortran
 {
 
-void lex_format(unsigned char *&cur, Location &loc,
-        unsigned char *&start);
-
 void Tokenizer::set_string(const std::string &str)
 {
     // The input string must be NULL terminated, otherwise the tokenizer will
@@ -113,25 +110,27 @@ uint64_t parse_int(const unsigned char *s)
 
 #define KW(x) token(yylval.string); RET(KW_##x);
 #define RET(x) token_loc(loc); last_token=yytokentype::x; return yytokentype::x;
-#define WARN_REL(x) add_rel_warning(diagnostics, yytokentype::TK_##x);
+#define WARN_REL(x) add_rel_warning(diagnostics, fixed_form, yytokentype::TK_##x);
 
-void Tokenizer::add_rel_warning(diag::Diagnostics &diagnostics, int rel_token) const {
-    static const std::map<int, std::pair<std::string, std::string>> m = {
-        {yytokentype::TK_EQ, {"==", ".eq."}},
-        {yytokentype::TK_NE, {"/=", ".ne."}},
-        {yytokentype::TK_LT, {"<",  ".lt."}},
-        {yytokentype::TK_GT, {">",  ".gt."}},
-        {yytokentype::TK_LE, {"<=", ".le."}},
-        {yytokentype::TK_GE, {">=", ".ge."}},
-    };
-    const std::string rel_new = m.at(rel_token).first;
-    const std::string rel_old = m.at(rel_token).second;
-    Location loc;
-    token_loc(loc);
-    diagnostics.tokenizer_style_label(
-        "Use '" + rel_new + "' instead of '" + rel_old + "'",
-        {loc},
-        "help: write this as '" + rel_new + "'");
+void Tokenizer::add_rel_warning(diag::Diagnostics &diagnostics, bool fixed_form, int rel_token) const {
+    if (!fixed_form) {
+        static const std::map<int, std::pair<std::string, std::string>> m = {
+            {yytokentype::TK_EQ, {"==", ".eq."}},
+            {yytokentype::TK_NE, {"/=", ".ne."}},
+            {yytokentype::TK_LT, {"<",  ".lt."}},
+            {yytokentype::TK_GT, {">",  ".gt."}},
+            {yytokentype::TK_LE, {"<=", ".le."}},
+            {yytokentype::TK_GE, {">=", ".ge."}},
+        };
+        const std::string rel_new = m.at(rel_token).first;
+        const std::string rel_old = m.at(rel_token).second;
+        Location loc;
+        token_loc(loc);
+        diagnostics.tokenizer_style_label(
+            "Use '" + rel_new + "' instead of '" + rel_old + "'",
+            {loc},
+            "help: write this as '" + rel_new + "'");
+    }
 }
 
 int Tokenizer::lex(Allocator &al, YYSTYPE &yylval, Location &loc, diag::Diagnostics &diagnostics)
@@ -294,6 +293,7 @@ int Tokenizer::lex(Allocator &al, YYSTYPE &yylval, Location &loc, diag::Diagnost
             'dowhile' { KW(DOWHILE) }
             'double' { KW(DOUBLE) }
             'doubleprecision' { KW(DOUBLE_PRECISION) }
+            'doublecomplex' { KW(DOUBLE_COMPLEX) }
             'elemental' { KW(ELEMENTAL) }
             'else' { KW(ELSE) }
             'elseif' { KW(ELSEIF) }
@@ -418,6 +418,7 @@ int Tokenizer::lex(Allocator &al, YYSTYPE &yylval, Location &loc, diag::Diagnost
             'inout' { KW(INOUT) }
             'in' whitespace 'out' { KW(IN_OUT) }
             'inquire' { KW(INQUIRE) }
+            'instantiate' { KW(INSTANTIATE) }
             'integer' { KW(INTEGER) }
             'intent' { KW(INTENT) }
             'interface' { KW(INTERFACE) }
@@ -486,6 +487,7 @@ int Tokenizer::lex(Allocator &al, YYSTYPE &yylval, Location &loc, diag::Diagnost
             'target' { KW(TARGET) }
             'team' { KW(TEAM) }
             'team_number' { KW(TEAM_NUMBER) }
+            'template' { KW(TEMPLATE) }
             'then' { KW(THEN) }
             'to' { KW(TO) }
             'type' { KW(TYPE) }

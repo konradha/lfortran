@@ -1,12 +1,15 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <cctype>
 
 #include <lfortran/parser/parser.h>
 #include <lfortran/parser/parser.tab.hh>
 #include <libasr/diagnostics.h>
+#include <libasr/string_utils.h>
 #include <lfortran/parser/parser_exception.h>
 #include <lfortran/parser/fixedform_tokenizer.h>
+#include <lfortran/utils.h>
 
 #include <lfortran/pickle.h>
 
@@ -18,7 +21,9 @@ Result<AST::TranslationUnit_t*> parse(Allocator &al, const std::string &s,
 {
     Parser p(al, diagnostics, fixed_form);
     try {
-        p.parse(s);
+        if (!p.parse(s)) {
+            return Error();
+        };
     } catch (const parser_local::TokenizerError &e) {
         Error error;
         diagnostics.diagnostics.push_back(e.d);
@@ -40,7 +45,7 @@ Result<AST::TranslationUnit_t*> parse(Allocator &al, const std::string &s,
         p.result.p, p.result.size());
 }
 
-void Parser::parse(const std::string &input)
+bool Parser::parse(const std::string &input)
 {
     inp = input;
     if (inp.size() > 0) {
@@ -51,13 +56,13 @@ void Parser::parse(const std::string &input)
     if (!fixed_form) {
         m_tokenizer.set_string(inp);
         if (yyparse(*this) == 0) {
-            return;
+            return true;
         }
     } else {
         f_tokenizer.set_string(inp);
-        f_tokenizer.tokenize_input(diag, m_a);
+        if (!f_tokenizer.tokenize_input(diag, m_a)) return false;
         if (yyparse(*this) == 0) {
-            return;
+            return true;
         }
     }
     throw parser_local::ParserError("Parsing unsuccessful (internal compiler error)");
@@ -127,11 +132,16 @@ void cont1(const std::string &s, size_t &pos, bool &ws_or_comment)
     pos++;
 }
 
+bool is_digit(unsigned char ch) {
+    return (ch >= '0' && ch <= '9');
+}
+
 enum LineType {
-    Comment, Statement, LabeledStatement, Continuation, EndOfFile
+    Comment, Statement, LabeledStatement, Continuation, EndOfFile,
+    ContinuationTab, StatementTab, Include,
 };
 
-// Determines the type of line
+// Determines the type of line in the fixed-form prescanner
 // `pos` points to the first character (column) of the line
 // The line ends with either `\n` or `\0`.
 LineType determine_line_type(const unsigned char *pos)
@@ -145,6 +155,20 @@ LineType determine_line_type(const unsigned char *pos)
         return LineType::Comment;
     } else if (*pos == '\0') {
         return LineType::EndOfFile;
+    } else if (*pos == '\t') {
+        pos++;
+        if (*pos == '\0') {
+            return LineType::EndOfFile;
+        } else {
+            if (is_digit(*pos)) {
+                // A continuation line after a tab
+                return LineType::ContinuationTab;
+            } else {
+                // A statement line after a tab
+                return LineType::StatementTab;
+            }
+
+        }
     } else {
         while (*pos == ' ') {
             pos++;
@@ -161,6 +185,8 @@ LineType determine_line_type(const unsigned char *pos)
         }
         if (col <= 6) {
             return LineType::LabeledStatement;
+        } else if (std::string(pos, pos + 7) == "include") {
+            return LineType::Include;
         } else {
             return LineType::Statement;
         }
@@ -176,7 +202,8 @@ void skip_rest_of_line(const std::string &s, size_t &pos)
 }
 
 // Parses string, including possible continuation lines
-void parse_string(std::string &out, const std::string &s, size_t &pos)
+void parse_string(std::string &out, const std::string &s, size_t &pos,
+    bool fixed_form)
 {
     char quote = s[pos];
     LFORTRAN_ASSERT(quote == '"' || quote == '\'');
@@ -185,7 +212,7 @@ void parse_string(std::string &out, const std::string &s, size_t &pos)
     while (pos < s.size() && ! (s[pos] == quote && s[pos+1] != quote)) {
         if (s[pos] == '\n') {
             pos++;
-            pos += 6;
+            if (fixed_form) pos += 6;
             continue;
         }
         if (s[pos] == quote && s[pos+1] == quote) {
@@ -214,12 +241,13 @@ void copy_label(std::string &out, const std::string &s, size_t &pos)
     }
 }
 
+// Only used in fixed-form
 void copy_rest_of_line(std::string &out, const std::string &s, size_t &pos,
     LocationManager &lm)
 {
     while (pos < s.size() && s[pos] != '\n') {
         if (s[pos] == '"' || s[pos] == '\'') {
-            parse_string(out, s, pos);
+            parse_string(out, s, pos, true);
         } else if (s[pos] == '!') {
             skip_rest_of_line(s, pos);
             out += '\n';
@@ -230,7 +258,8 @@ void copy_rest_of_line(std::string &out, const std::string &s, size_t &pos,
             lm.out_start.push_back(out.size());
             lm.in_start.push_back(pos);
         } else {
-            out += s[pos];
+            // Copy the character, but covert to lowercase
+            out += tolower(s[pos]);
             pos++;
         }
     }
@@ -251,8 +280,46 @@ bool check_newlines(const std::string &s, const std::vector<uint32_t> &newlines)
     return true;
 }
 
+void process_include(std::string& out, const std::string& s,
+                     LocationManager& lm, size_t& pos, bool fixed_form,
+                     const std::string &root_dir)
+{
+    std::string include_filename;
+    parse_string(include_filename, s, pos, false);
+    include_filename = include_filename.substr(1, include_filename.size() - 2);
+    if (is_relative_path(include_filename)) {
+        include_filename = join_paths({root_dir, include_filename});
+    }
+
+    std::string include;
+    if (!read_file(include_filename, include)) {
+        throw LCompilersException("Include file '" + include_filename
+            + "' cannot be opened");
+    }
+
+    LocationManager lm_tmp;
+    lm_tmp.in_filename = include_filename;
+    include = fix_continuation(include, lm_tmp, fixed_form, root_dir);
+
+    // Possible it goes here
+    // lm.out_start.push_back(out.size());
+    out += include;
+    while (pos < s.size() && s[pos] != '\n') pos++;
+    lm.out_start.push_back(out.size());
+    lm.in_start.push_back(pos);
+}
+
+bool is_include(const std::string &s, uint32_t pos) {
+    while (pos < s.size() && s[pos] == ' ') pos++;
+    if (pos + 6 < s.size() && s.substr(pos, 7) == "include") {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 std::string fix_continuation(const std::string &s, LocationManager &lm,
-        bool fixed_form)
+        bool fixed_form, const std::string &root_dir)
 {
     if (fixed_form) {
         // `pos` is the position in the original code `s`
@@ -263,25 +330,23 @@ std::string fix_continuation(const std::string &s, LocationManager &lm,
         std::string out;
         size_t pos = 0;
         /* Note:
-         * This should be a valid fixed form prescanner, except the following
-         * features which are currently not implemented:
+         * This is a fixed-form prescanner, which:
+         *
+         *   * Removes all whitespace
+         *   * Joins continuation lines
+         *   * Removes comments
+         *   * Handles the first 6 columns
+         *   * Converts to lowercase
+         *
+         * features which are currently not yet implemented:
          *
          *   * Continuation lines after comment(s) or empty lines (they will be
          *     appended to the previous comment, and thus skipped)
          *   * Characters after column 72 are included, but should be ignored
-         *   * White space is preserved (but should be removed)
          *
-         * The parser together with this fixed form prescanner works as a fixed
-         * form parser with some limitations. Due to the last point above,
-         * white space is not ignored because it is needed for the parser, so
-         * the following are not supported:
-         *
-         *   * Extra space: `.  and.`, `3.5 55 d0`, ...
-         *   * Missing space: `doi=1,5`, `callsome_subroutine(x)`
-         *
-         * It turns out most fixed form codes use white space as one would
-         * expect, so it is not such a big problem and the fixes needed to do
-         * in the fixed form Fortran code are relatively minor in practice.
+         * After the prescanner, the tokenizer is itself a recursive descent
+         * parser that correctly identifies tokens so that the Bison
+         * parser can parse it correctly.
          */
         while (true) {
             const char *p = &s[pos];
@@ -297,6 +362,14 @@ std::string fix_continuation(const std::string &s, LocationManager &lm,
                 case LineType::Statement : {
                     // Copy from column 7
                     pos += 6;
+                    lm.out_start.push_back(out.size());
+                    lm.in_start.push_back(pos);
+                    copy_rest_of_line(out, s, pos, lm);
+                    break;
+                }
+                case LineType::StatementTab : {
+                    // Copy from column 2
+                    pos += 1;
                     lm.out_start.push_back(out.size());
                     lm.in_start.push_back(pos);
                     copy_rest_of_line(out, s, pos, lm);
@@ -320,6 +393,26 @@ std::string fix_continuation(const std::string &s, LocationManager &lm,
                     copy_rest_of_line(out, s, pos, lm);
                     break;
                 }
+                case LineType::ContinuationTab : {
+                    // Append from column 3 to previous line
+                    out = out.substr(0, out.size()-1); // Remove the last '\n'
+                    pos += 2;
+                    lm.out_start.push_back(out.size());
+                    lm.in_start.push_back(pos);
+                    copy_rest_of_line(out, s, pos, lm);
+                    break;
+                }
+                case LineType::Include: {
+                    while (pos < s.size() && s[pos] == ' ') pos++;
+                    LFORTRAN_ASSERT(s.substr(pos, 7) == "include");
+                    pos += 7;
+                    while (pos < s.size() && s[pos] == ' ') pos++;
+                    if ((s[pos] == '"') || (s[pos] == '\'')) {
+                        process_include(out, s, lm, pos, fixed_form,
+                            root_dir);
+                    }
+                    break;
+                }
                 case LineType::EndOfFile : {
                     break;
                 }
@@ -336,8 +429,21 @@ std::string fix_continuation(const std::string &s, LocationManager &lm,
         lm.in_start.push_back(0);
         std::string out;
         size_t pos = 0;
-        bool in_comment = false;
+        bool in_comment = false, newline = true;
         while (pos < s.size()) {
+            if (newline && is_include(s, pos)) {
+                while (pos < s.size() && s[pos] == ' ') pos++;
+                LFORTRAN_ASSERT(pos + 6 < s.size() && s.substr(pos, 7) == "include")
+                pos += 7;
+                while (pos < s.size() && s[pos] == ' ') pos++;
+                if (pos < s.size() && ((s[pos] == '"') || (s[pos] == '\''))) {
+                    process_include(out, s, lm, pos, fixed_form,
+                        root_dir);
+                } else {
+                    throw parser_local::ParserError("Excpected a string in an include line");
+                }
+            }
+            newline = false;
             if (s[pos] == '!') in_comment = true;
             if (in_comment && s[pos] == '\n') in_comment = false;
             if (!in_comment && s[pos] == '&') {
@@ -361,7 +467,10 @@ std::string fix_continuation(const std::string &s, LocationManager &lm,
                     lm.in_start.push_back(pos);
                 }
             } else {
-                if (s[pos] == '\n') lm.in_newlines.push_back(pos);
+                if (s[pos] == '\n') {
+                    lm.in_newlines.push_back(pos);
+                    newline = true;
+                }
             }
             out += s[pos];
             pos++;
@@ -555,6 +664,7 @@ std::string token2text(const int token)
         T(KW_INCLUDE, "include")
         T(KW_INOUT, "inout")
         T(KW_INQUIRE, "inquire")
+        T(KW_INSTANTIATE, "instantiate")
         T(KW_INTEGER, "integer")
         T(KW_INTENT, "intent")
         T(KW_INTERFACE, "interface")
@@ -623,6 +733,7 @@ std::string token2text(const int token)
         T(KW_TARGET, "target")
         T(KW_TEAM, "team")
         T(KW_TEAM_NUMBER, "team_number")
+        T(KW_TEMPLATE, "template")
         T(KW_THEN, "then")
         T(KW_TO, "to")
         T(KW_TYPE, "type")
@@ -651,11 +762,17 @@ void Parser::handle_yyerror(const Location &loc, const std::string &msg)
         std::string token_str;
         // Determine the unexpected token's type:
         if (this->fixed_form) {
-            unsigned int invalid_token = this->f_tokenizer.token_pos - 1;            
-            if (invalid_token >= f_tokenizer.tokens.size()) {
-                invalid_token = f_tokenizer.tokens.size()-1;
+            unsigned int invalid_token = this->f_tokenizer.token_pos;
+            if (invalid_token == 0 || invalid_token > f_tokenizer.tokens.size()) {
+                message = "unknown error";
+                throw parser_local::ParserError(message, loc);
             }
+            invalid_token--;
+            LFORTRAN_ASSERT(invalid_token < f_tokenizer.tokens.size())
+            LFORTRAN_ASSERT(invalid_token < f_tokenizer.locations.size())
             token = f_tokenizer.tokens[invalid_token];
+            Location loc = f_tokenizer.locations[invalid_token];
+            token_str = f_tokenizer.token_at_loc(loc);
         } else {
             LFortran::YYSTYPE yylval_;
             YYLTYPE yyloc_;

@@ -371,7 +371,7 @@ int emit_prescan(const std::string &infile, CompilerOptions &compiler_options)
     LFortran::LocationManager lm;
     lm.in_filename = infile;
     std::string prescan = LFortran::fix_continuation(input, lm,
-        compiler_options.fixed_form);
+        compiler_options.fixed_form, LFortran::parent_path(lm.in_filename));
     std::cout << prescan << std::endl;
     return 0;
 }
@@ -387,7 +387,8 @@ int emit_tokens(const std::string &infile, bool line_numbers, const CompilerOpti
     LFortran::diag::Diagnostics diagnostics;
     LFortran::LocationManager lm;
     if (compiler_options.prescan || compiler_options.fixed_form) {
-        input = fix_continuation(input, lm, compiler_options.fixed_form);
+        input = fix_continuation(input, lm,
+            compiler_options.fixed_form, LFortran::parent_path(infile));
     }
     auto res = LFortran::tokens(al, input, diagnostics, &stypes, &locations,
         compiler_options.fixed_form);
@@ -560,7 +561,10 @@ int emit_asr(const std::string &infile,
     LFortran::ASR::TranslationUnit_t* asr = r.result;
 
     Allocator al(64*1024*1024);
-    pass_manager.apply_passes(al, asr, "f", true);
+    LCompilers::PassOptions pass_options;
+    pass_options.always_run = true;
+    pass_options.run_fun = "f";
+    pass_manager.apply_passes(al, asr, pass_options, diagnostics);
     std::cout << LFortran::pickle(*asr, compiler_options.use_colors, compiler_options.indent,
             with_intrinsic_modules) << std::endl;
     return 0;
@@ -604,6 +608,24 @@ int emit_c(const std::string &infile, CompilerOptions &compiler_options)
     }
 }
 
+int emit_julia(const std::string &infile, CompilerOptions &compiler_options)
+{
+    std::string input = read_file(infile);
+
+    LFortran::FortranEvaluator fe(compiler_options);
+    LFortran::LocationManager lm;
+    LFortran::diag::Diagnostics diagnostics;
+    lm.in_filename = infile;
+    LFortran::Result<std::string> julia = fe.get_julia(input, lm, diagnostics);
+    std::cerr << diagnostics.render(input, lm, compiler_options);
+    if (julia.ok) {
+        std::cout << julia.result;
+        return 0;
+    } else {
+        LFORTRAN_ASSERT(diagnostics.has_error())
+        return 1;
+    }
+}
 
 int save_mod_files(const LFortran::ASR::TranslationUnit_t &u)
 {
@@ -627,13 +649,14 @@ int save_mod_files(const LFortran::ASR::TranslationUnit_t &u)
                 symtab, nullptr, 0);
             LFortran::ASR::TranslationUnit_t *tu =
                 LFortran::ASR::down_cast2<LFortran::ASR::TranslationUnit_t>(asr);
-            LFORTRAN_ASSERT(LFortran::asr_verify(*tu));
+            LFortran::diag::Diagnostics diagnostics;
+            LFORTRAN_ASSERT(LFortran::asr_verify(*tu, true, diagnostics));
 
             std::string modfile_binary = LFortran::save_modfile(*tu);
 
             m->m_symtab->parent = orig_symtab;
 
-            LFORTRAN_ASSERT(LFortran::asr_verify(u));
+            LFORTRAN_ASSERT(LFortran::asr_verify(u, true, diagnostics));
 
 
             std::string modfile = std::string(m->m_name) + ".mod";
@@ -1167,6 +1190,10 @@ int link_executable(const std::vector<std::string> &infiles,
                 std::cout << "The command '" + cmd + "' failed." << std::endl;
                 return 10;
             }
+            if (outfile == "a.out") {
+                err = system("a.out");
+                if (err != 0) return err;
+            }
         } else {
             std::string CC;
             std::string base_path = "\"" + runtime_library_dir + "\"";
@@ -1207,6 +1234,10 @@ int link_executable(const std::vector<std::string> &infiles,
             if (err) {
                 std::cout << "The command '" + cmd + "' failed." << std::endl;
                 return 10;
+            }
+            if (outfile == "a.out") {
+                err = system("./a.out");
+                if (err != 0) return err;
             }
         }
         return 0;
@@ -1401,6 +1432,7 @@ int main(int argc, char *argv[])
         bool show_c = false;
         bool show_asm = false;
         bool show_wat = false;
+        bool show_julia = false;
         bool time_report = false;
         bool static_link = false;
         std::string arg_backend = "llvm";
@@ -1459,6 +1491,7 @@ int main(int argc, char *argv[])
         app.add_flag("--show-c", show_c, "Show C translation source for the given file and exit");
         app.add_flag("--show-asm", show_asm, "Show assembly for the given file and exit");
         app.add_flag("--show-wat", show_wat, "Show WAT (WebAssembly Text Format) and exit");
+        app.add_flag("--show-julia", show_julia, "Show Julia translation source for the given file and exit");
         app.add_flag("--show-stacktrace", compiler_options.show_stacktrace, "Show internal stacktrace on compiler errors");
         app.add_flag("--symtab-only", compiler_options.symtab_only, "Only create symbol tables in ASR (skip executable stmt)");
         app.add_flag("--time-report", time_report, "Show compilation time report");
@@ -1469,11 +1502,14 @@ int main(int argc, char *argv[])
         app.add_option("--backend", arg_backend, "Select a backend (llvm, cpp, x86, wasm)")->capture_default_str();
         app.add_flag("--openmp", compiler_options.openmp, "Enable openmp");
         app.add_flag("--generate-object-code", compiler_options.generate_object_code, "Generate object code into .o files");
+        app.add_flag("--rtlib", compiler_options.rtlib, "Include the full runtime library in the LLVM output");
         app.add_flag("--fast", compiler_options.fast, "Best performance (disable strict standard compliance)");
         app.add_flag("--link-with-gcc", link_with_gcc, "Calls GCC for linking instead of clang");
         app.add_option("--target", compiler_options.target, "Generate code for the given target")->capture_default_str();
         app.add_flag("--print-targets", print_targets, "Print the registered targets");
         app.add_flag("--implicit-typing", compiler_options.implicit_typing, "Allow implicit typing");
+        app.add_flag("--allow-implicit-interface", compiler_options.implicit_interface, "Allow implicit interface");
+
 
         if( compiler_options.fast ) {
             lfortran_pass_manager.use_optimization_passes();
@@ -1542,6 +1578,9 @@ int main(int argc, char *argv[])
         compiler_options.use_colors = !arg_no_color;
 
         if (fmt) {
+            if (CLI::NonexistentPath(arg_fmt_file).empty())
+                throw LFortran::LCompilersException("File does not exist: " + arg_fmt_file);
+
             return format(arg_fmt_file, arg_fmt_inplace, !arg_fmt_no_color,
                 arg_fmt_indent, arg_fmt_indent_unit, compiler_options);
         }
@@ -1596,6 +1635,8 @@ int main(int argc, char *argv[])
         // TODO: for now we ignore the other filenames, only handle
         // the first:
         std::string arg_file = arg_files[0];
+        if (CLI::NonexistentPath(arg_file).empty())
+            throw LFortran::LCompilersException("File does not exist: " + arg_file);
 
         std::string outfile;
         std::string basename;
@@ -1619,6 +1660,8 @@ int main(int argc, char *argv[])
             outfile = basename + ".ll";
         } else if (show_wat) {
             outfile = basename + ".wat";
+        } else if (show_julia) {
+            outfile = basename + ".jl";
         } else {
             outfile = "a.out";
         }
@@ -1670,6 +1713,9 @@ int main(int argc, char *argv[])
         }
         if (show_c) {
             return emit_c(arg_file, compiler_options);
+        }
+        if (show_julia) {
+            return emit_julia(arg_file, compiler_options);
         }
         if (arg_S) {
             if (backend == Backend::llvm) {

@@ -11,6 +11,14 @@ interface aimag
     module procedure caimag, zaimag
 end interface
 
+interface imag
+    module procedure caimag
+end interface
+
+interface dimag
+    module procedure zaimag
+end interface
+
 interface sqrt
     module procedure ssqrt, dsqrt, csqrt, zsqrt
 end interface
@@ -20,7 +28,7 @@ interface exp
 end interface
 
 interface log
-    module procedure slog, dlog, clog, zlog
+    module procedure slog, dlog, clog, zlog, alog
 end interface
 
 interface erf
@@ -319,6 +327,17 @@ r = c_slog(x)
 end function
 
 elemental real(dp) function dlog(x) result(r)
+real(dp), intent(in) :: x
+interface
+    pure real(c_double) function c_dlog(x) bind(c, name="_lfortran_dlog")
+    import :: c_double
+    real(c_double), intent(in), value :: x
+    end function
+end interface
+r = c_dlog(x)
+end function
+
+elemental real(dp) function alog(x) result(r)
 real(dp), intent(in) :: x
 interface
     pure real(c_double) function c_dlog(x) bind(c, name="_lfortran_dlog")

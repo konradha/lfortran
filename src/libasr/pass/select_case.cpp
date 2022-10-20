@@ -165,13 +165,13 @@ public:
     }
 };
 
-void pass_replace_select_case(Allocator &al, ASR::TranslationUnit_t &unit) {
+void pass_replace_select_case(Allocator &al, ASR::TranslationUnit_t &unit,
+                              const LCompilers::PassOptions& /*pass_options*/) {
     SelectCaseVisitor v(al);
     // Each call transforms only one layer of nested loops, so we call it twice
     // to transform doubly nested loops:
     v.visit_TranslationUnit(unit);
     v.visit_TranslationUnit(unit);
-    LFORTRAN_ASSERT(asr_verify(unit));
 }
 
 

@@ -170,10 +170,10 @@ output
 *.out
 *.mod
 *.smod
-
 *.wasm
 *.js
 !src/lfortran/pre.js
+*.data
 /.ccls-cache/
 .cache/
 ext/
