@@ -1807,7 +1807,7 @@ public:
     IntrinsicProcedures intrinsic_procedures;
     IntrinsicProceduresAsASRNodes intrinsic_procedures_as_asr_nodes;
     std::set<std::string> intrinsic_module_procedures_as_asr_nodes = {
-        "c_loc", "c_f_pointer", "c_associated", "c_funloc"
+        "c_loc", "c_f_pointer", "c_f_procpointer", "c_associated", "c_funloc"
     };
 
     ASR::accessType dflt_access = ASR::Public;
@@ -9094,8 +9094,9 @@ public:
                     ASR::symbol_t* type_declaration = nullptr;
                     ASR::ttype_t* ret_type_base = ASRUtils::extract_type(ret_type);
                     if (ASR::is_a<ASR::StructType_t>(*ret_type_base)) {
-                        type_declaration = ASRUtils::symbol_get_past_external(
-                            ASRUtils::get_struct_sym_from_struct_expr(val));
+                        type_declaration = ASRUtils::import_struct_type(al,
+                            ASRUtils::get_struct_sym_from_struct_expr(val),
+                            current_scope);
                     }
                     ASR::symbol_t* tmp_sym =
                         ASR::down_cast<ASR::symbol_t>(

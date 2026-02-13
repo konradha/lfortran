@@ -1899,6 +1899,7 @@ RUN(NAME derived_types_100 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME derived_types_101 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME derived_types_102 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME derived_types_103 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME derived_types_104 LABELS gfortran llvm)
 RUN(NAME derived_type_with_default_init LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME derived_type_with_default_init_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME multi_file_member_access_01 LABELS gfortran llvm llvm_single_invocation EXTRAFILES multi_file_member_access_01_mod.f90)
@@ -2836,6 +2837,7 @@ RUN(NAME character_18 LABELS gfortran llvmImplicit)
 RUN(NAME character_19 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc fortran)
 RUN(NAME character_20 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc fortran)
 RUN(NAME character_21 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
+RUN(NAME character_22 LABELS gfortran llvm)
 RUN(NAME char_array_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME char_array_indexing LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME char_array_indexing_02 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
@@ -2850,6 +2852,8 @@ RUN(NAME c_ptr_05 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME c_ptr_06 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME c_ptr_07 LABELS gfortran llvm)
 RUN(NAME c_ptr_08 LABELS gfortran llvm)
+
+RUN(NAME c_f_proc_ptr_01 LABELS gfortran llvm EXTRAFILES c_f_proc_ptr_01.c) # c_f_procpointer
 
 RUN(NAME arrayitem_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc llvmStackArray)
 RUN(NAME arrayitem_02 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc llvmStackArray)
@@ -3233,6 +3237,7 @@ RUN(NAME separate_compilation_27 LABELS gfortran llvm_submodule EXTRAFILES separ
 RUN(NAME separate_compilation_28 LABELS gfortran llvm EXTRAFILES separate_compilation_28a.f90 separate_compilation_28b.f90 EXTRA_ARGS --implicit-interface)
 RUN(NAME separate_compilation_29 LABELS gfortran llvm EXTRAFILES separate_compilation_29a.f90 separate_compilation_29b.f90 EXTRA_ARGS --separate-compilation)
 RUN(NAME separate_compilation_30 LABELS gfortran llvm EXTRAFILES separate_compilation_30a.f90 separate_compilation_30b.f90 EXTRA_ARGS --separate-compilation)
+RUN(NAME separate_compilation_31 LABELS gfortran llvm EXTRAFILES separate_compilation_31a.f90 separate_compilation_31b.f90 EXTRA_ARGS --separate-compilation)
 
 
 RUN(NAME no_explicit_return_type_01 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc
