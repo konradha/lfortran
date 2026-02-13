@@ -54,21 +54,22 @@ def run_test(backend, std, test_pattern=None):
         # Use default Make generator
         generator_flags = ""
 
-    common=f" {generator_flags} -DCURRENT_BINARY_DIR={BASE_DIR}/test-{backend} -S {BASE_DIR} -B {BASE_DIR}/test-{backend}"
+    build_type = "" if backend == "gfortran" else " -DCMAKE_BUILD_TYPE=Release"
+    common=f" {generator_flags}{build_type} -DCURRENT_BINARY_DIR={BASE_DIR}/test-{backend} -S {BASE_DIR} -B {BASE_DIR}/test-{backend}"
     if backend == "gfortran":
         run_cmd(f"FC=gfortran cmake" + common,
                 cwd=cwd)
     elif backend == "cpp":
-        run_cmd(f"FC=lfortran FFLAGS=\"--openmp\" cmake -DLFORTRAN_BACKEND={backend} -DFAST={fast_tests} "
+        run_cmd(f"FC=lfortran FFLAGS=\"--openmp\" FCFLAGS=\"\" cmake -DLFORTRAN_BACKEND={backend} -DFAST={fast_tests} "
                 f"-DLLVM_GOC={separate_compilation} -DNOFAST_LLVM16={nofast_llvm16} {std_string}" + common,
                 cwd=cwd)
     elif backend == "fortran":
-        run_cmd(f"FC=lfortran cmake -DLFORTRAN_BACKEND={backend} "
+        run_cmd(f"FC=lfortran FFLAGS=\"\" FCFLAGS=\"\" cmake -DLFORTRAN_BACKEND={backend} "
             f"-DFAST={fast_tests} -DLLVM_GOC={separate_compilation} -DNOFAST_LLVM16={nofast_llvm16} "
             f"-DCMAKE_Fortran_FLAGS=\"-fPIC\" {std_string}" + common,
                 cwd=cwd)
     else:
-        run_cmd(f"FC=lfortran cmake -DLFORTRAN_BACKEND={backend} -DFAST={fast_tests} "
+        run_cmd(f"FC=lfortran FFLAGS=\"\" FCFLAGS=\"\" cmake -DLFORTRAN_BACKEND={backend} -DFAST={fast_tests} "
                 f"-DLLVM_GOC={separate_compilation} {std_string} -DNOFAST_LLVM16={nofast_llvm16} " + common,
                 cwd=cwd)
 

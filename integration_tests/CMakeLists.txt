@@ -1876,6 +1876,8 @@ RUN(NAME derived_types_79 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc EXTRA_AR
 RUN(NAME derived_types_80 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc EXTRA_ARGS --realloc-lhs-arrays)
 RUN(NAME derived_types_81 LABELS gfortran llvm)
 RUN(NAME derived_types_82 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc EXTRA_ARGS --realloc-lhs-arrays)
+RUN(NAME oalib_issue1_derived_minloc LABELS gfortran llvm)
+RUN(NAME oalib_issue2_derived_maxloc LABELS gfortran llvm)
 RUN(NAME derived_types_83 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)
 RUN(NAME derived_types_84 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc EXTRAFILES derived_types_84_module.f90 EXTRA_ARGS --separate-compilation)
 RUN(NAME derived_types_85 LABELS gfortran llvm llvm_wasm llvm_wasm_emcc)

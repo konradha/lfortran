@@ -10,6 +10,10 @@ sys.path.append(os.path.join(ROOT_DIR, "src", "libasr"))
 
 from compiler_tester.tester import color, fg, log, run_test, style, tester_main
 
+if sys.platform == "darwin":
+    os.environ.pop("LD", None)
+    os.environ.setdefault("LFORTRAN_LINKER", "cc")
+
 def run_cmd(cmd, cwd=None):
     print(f"+ {cmd}")
     process = sp.run(cmd, shell=True, cwd=cwd)

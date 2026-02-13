@@ -7250,6 +7250,25 @@ public:
         ASR::expr_t* v_Var = nullptr;
         if( v_expr ) {
             ASR::ttype_t* struct_t_mem_type = ASRUtils::symbol_type(v);
+            if (ASRUtils::is_array(struct_t_mem_type) &&
+                ASRUtils::is_array(ASRUtils::expr_type(v_expr))) {
+                ASR::dimension_t* member_m_dims = nullptr;
+                size_t member_n_dims = ASRUtils::extract_dimensions_from_ttype(
+                    struct_t_mem_type, member_m_dims);
+                ASR::dimension_t* base_m_dims = nullptr;
+                size_t base_n_dims = ASRUtils::extract_dimensions_from_ttype(
+                    ASRUtils::expr_type(v_expr), base_m_dims);
+                Vec<ASR::dimension_t> combined_dims;
+                combined_dims.reserve(al, member_n_dims + base_n_dims);
+                for (size_t i = 0; i < member_n_dims; i++) {
+                    combined_dims.push_back(al, member_m_dims[i]);
+                }
+                for (size_t i = 0; i < base_n_dims; i++) {
+                    combined_dims.push_back(al, base_m_dims[i]);
+                }
+                struct_t_mem_type = ASRUtils::duplicate_type(
+                    al, ASRUtils::extract_type(struct_t_mem_type), &combined_dims);
+            }
             ASR::symbol_t* v_ext = ASRUtils::import_struct_instance_member(al, v, current_scope);
             v_Var = ASRUtils::EXPR(ASR::make_StructInstanceMember_t(
                         al, v_expr->base.loc, v_expr, v_ext, struct_t_mem_type, nullptr));
@@ -7327,7 +7346,25 @@ public:
             ai.m_step = m_step;
             args.push_back(al, ai);
         }
-
+        size_t v_var_n_dims = ASRUtils::extract_n_dims_from_ttype(
+            ASRUtils::expr_type(v_Var));
+        if (v_expr && ASRUtils::is_array(ASRUtils::expr_type(v_expr)) &&
+            v_var_n_dims > args.size()) {
+            is_item = false;
+            ASR::ttype_t* int_type = ASRUtils::TYPE(
+                ASR::make_Integer_t(al, loc, compiler_options.po.default_integer_kind));
+            size_t n_user_args = args.size();
+            for (size_t i = n_user_args; i < v_var_n_dims; i++) {
+                ASR::array_index_t ai;
+                ai.loc = loc;
+                size_t base_dim = i - n_user_args + 1;
+                ai.m_left = ASRUtils::get_bound<SemanticAbort>(v_expr, base_dim, "lbound", al, diag);
+                ai.m_right = ASRUtils::get_bound<SemanticAbort>(v_expr, base_dim, "ubound", al, diag);
+                ai.m_step = ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, loc, 1, int_type));
+                args.push_back(al, ai);
+            }
+            n_args = args.size();
+        }
         ASR::ttype_t *type = nullptr;
         type = ASRUtils::type_get_past_pointer(ASRUtils::symbol_type(f2));
         ASR::expr_t *arr_ref_val = nullptr;
@@ -7575,9 +7612,10 @@ public:
                         }
                     }
                 }
-                return (ASR::asr_t*) replace_with_common_block_variables(ASRUtils::EXPR(ASRUtils::make_ArrayItem_t_util(al, loc,
+                ASR::expr_t* array_item_expr = ASRUtils::EXPR(ASRUtils::make_ArrayItem_t_util(al, loc,
                     v_Var, args.p, args.size(), final_type,
-                    ASR::arraystorageType::ColMajor, arr_ref_val)));
+                    ASR::arraystorageType::ColMajor, arr_ref_val));
+                return (ASR::asr_t*) replace_with_common_block_variables(array_item_expr);
             }
         } else {
             ASR::ttype_t *v_type = ASRUtils::symbol_type(v);
@@ -14973,22 +15011,8 @@ public:
                     array_type = ASRUtils::duplicate_type(al,var_type);
                 }
             } else if ( tmp2->m_v->type == ASR::exprType::ArraySection ) {
-                ASR::ArraySection_t* array_section = ASR::down_cast<ASR::ArraySection_t>(tmp2->m_v);
-
-                Vec<ASR::dimension_t> dims;
-                dims.reserve(al, 1);
-
-                ASR::dimension_t dim;
-                dim.loc = loc;
-                dim.m_start = ASRUtils::EXPR(ASR::make_IntegerConstant_t(al, loc, 1, ASRUtils::TYPE(ASR::make_Integer_t(al, loc, 4))));
-                dim.m_length = ASRUtils::compute_length_from_start_end(al, array_section->m_args->m_left, array_section->m_args->m_right);
-                dims.push_back(al, dim);
-
                 array_found = true;
-                array_type = ASRUtils::TYPE(ASR::make_Array_t(
-                    al, array_section->base.base.loc,
-                    tmp2->m_type, dims.p, dims.size(),
-                    ASRUtils::is_character(*tmp2->m_type)? ASR::PointerArray : ASR::FixedSizeArray));
+                array_type = ASRUtils::duplicate_type(al, ASRUtils::expr_type(tmp2->m_v));
             }
             tmp_copy = (ASR::asr_t*)(tmp2->m_v);
         }
